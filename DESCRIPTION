@@ -1,0 +1,32 @@
+Package: investmentVolData
+Type: Package
+Title: Create Data for Paper "Aggregate Investment and Stock Returns"
+Version: 0.99.0
+Authors@R: c( 
+     person(given = "Fernando",
+           family = "Duarte",
+           role = c("cre", "aut"),
+           email = "fernando.duarte@gmail.com",
+           comment = c(ORCID = "0000-0002-8495-6936"))
+    )
+Description: Create Data for Paper "Aggregate Investment and Stock Returns".
+URL: https://github.com/fernando-duarte/investmentVolData
+BugReports: https://github.com/fernando-duarte/investmentVolData/issues
+Depends: R (>= 4.2)
+License: MIT + file LICENSE
+Encoding: UTF-8
+Suggests:
+    knitr,
+    testdat,
+    testthat (>= 3.0.0)
+Imports:
+  alfred,
+  dplyr,
+  fredr,
+  lubridate,
+  tidyr
+VignetteBuilder: knitr
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Config/testthat/edition: 3
+LazyData: true
