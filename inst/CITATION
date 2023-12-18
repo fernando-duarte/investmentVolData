@@ -1,0 +1,16 @@
+citHeader("If you use this package, please cite:")
+
+bibentry(
+  bibtype = "Article",
+  entry    = "Article",
+  title    = "Aggregate Investment and Stock Returns",
+  author   = "Fernando Duarte, Leonid Kogan, Dmitry Livdan",
+  journal  = "journalName",
+  year     = "2023",
+  volume   = "volume",
+  number   = "number",
+  pages    = "pages",
+  url      = "https://github.com/fernando-duarte/investmentVol",
+  textVersion = paste("Fernando Duarte, Leonid Kogan, Dmitry Livdan, \"Aggregate Investment and Stock Returns\", 2023, [https://github.com/fernando-duarte/investmentVol](https://github.com/fernando-duarte/investmentVol)"
+  )
+)
