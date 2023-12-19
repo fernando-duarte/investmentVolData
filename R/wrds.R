@@ -1,9 +1,8 @@
-#'@export get_wrds
-#'@importFrom rlang .data
+#' @export get_wrds
+#' @importFrom rlang .data
 get_wrds <- function(
     start_date = "1950-01-01",
-    end_date = "2023-01-01"
-  ){
+    end_date = "2023-01-01") {
   start_date <- lubridate::ymd(start_date)
   end_date <- lubridate::ymd(end_date)
   wrds <- RPostgres::dbConnect(
@@ -20,7 +19,7 @@ get_wrds <- function(
   msenames_db <- dplyr::tbl(wrds, dbplyr::in_schema("crsp", "msenames"))
   msedelist_db <- dplyr::tbl(wrds, dbplyr::in_schema("crsp", "msedelist"))
 
-  #crsp_monthly
+  # crsp_monthly
   msf_db |>
     dplyr::filter(.data$date >= start_date & .data$date <= end_date) |>
     dplyr::inner_join(
@@ -55,51 +54,49 @@ get_wrds <- function(
       shrout = .data$shrout * 1000
     )
 }
-#'@export clean_wrds
-#'@importFrom rlang .data
+#' @export clean_wrds
+#' @importFrom rlang .data
 #' @importFrom lubridate %m+%
 clean_wrds <- function(
     data,
     start_date = "1950-01-01",
-    end_date = "2023-01-01"
-){
+    end_date = "2023-01-01") {
+  crsp_monthly <- data |>
+    dplyr::mutate(
+      mktcap = abs(.data$shrout * .data$altprc) / 10^6, # in millions of USD
+      mktcap = dplyr::na_if(.data$mktcap, 0)
+    )
 
-crsp_monthly <- data |>
-  dplyr::mutate(
-    mktcap = abs(.data$shrout * .data$altprc) / 10^6, #in millions of USD
-    mktcap = dplyr::na_if(.data$mktcap, 0)
-  )
+  mktcap_lag <- crsp_monthly |>
+    dplyr::mutate(month = .data$month %m+% months(1)) |>
+    dplyr::select(.data$permno, .data$month, mktcap_lag = .data$mktcap)
 
-mktcap_lag <- crsp_monthly |>
-  dplyr::mutate(month = .data$month %m+% months(1)) |>
-  dplyr::select(.data$permno, .data$month, mktcap_lag = .data$mktcap)
+  crsp_monthly <- crsp_monthly |>
+    dplyr::left_join(.data$mktcap_lag, by = c("permno", "month"))
 
-crsp_monthly <- crsp_monthly |>
-  dplyr::left_join(.data$mktcap_lag, by = c("permno", "month"))
+  crsp_monthly <- crsp_monthly |>
+    dplyr::mutate(exchange = dplyr::case_when(
+      .data$exchcd %in% c(1, 31) ~ "NYSE",
+      .data$exchcd %in% c(2, 32) ~ "AMEX",
+      .data$exchcd %in% c(3, 33) ~ "NASDAQ",
+      .default = "Other"
+    ))
 
-crsp_monthly <- crsp_monthly |>
-  dplyr::mutate(exchange = dplyr::case_when(
-    .data$exchcd %in% c(1, 31) ~ "NYSE",
-    .data$exchcd %in% c(2, 32) ~ "AMEX",
-    .data$exchcd %in% c(3, 33) ~ "NASDAQ",
-    .default = "Other"
-  ))
-
-crsp_monthly <- crsp_monthly |>
-  dplyr::mutate(industry = dplyr::case_when(
-    .data$siccd >= 1 & .data$siccd <= 999 ~ "Agriculture",
-    .data$siccd >= 1000 & .data$siccd <= 1499 ~ "Mining",
-    .data$siccd >= 1500 & .data$siccd <= 1799 ~ "Construction",
-    .data$siccd >= 2000 & .data$siccd <= 3999 ~ "Manufacturing",
-    .data$siccd >= 4000 & .data$siccd <= 4899 ~ "Transportation",
-    .data$siccd >= 4900 & .data$siccd <= 4999 ~ "Utilities",
-    .data$siccd >= 5000 & .data$siccd <= 5199 ~ "Wholesale",
-    .data$siccd >= 5200 & .data$siccd <= 5999 ~ "Retail",
-    .data$siccd >= 6000 & .data$siccd <= 6799 ~ "Finance",
-    .data$siccd >= 7000 & .data$siccd <= 8999 ~ "Services",
-    .data$siccd >= 9000 & .data$siccd <= 9999 ~ "Public",
-    TRUE ~ "Missing"
-  ))
+  crsp_monthly <- crsp_monthly |>
+    dplyr::mutate(industry = dplyr::case_when(
+      .data$siccd >= 1 & .data$siccd <= 999 ~ "Agriculture",
+      .data$siccd >= 1000 & .data$siccd <= 1499 ~ "Mining",
+      .data$siccd >= 1500 & .data$siccd <= 1799 ~ "Construction",
+      .data$siccd >= 2000 & .data$siccd <= 3999 ~ "Manufacturing",
+      .data$siccd >= 4000 & .data$siccd <= 4899 ~ "Transportation",
+      .data$siccd >= 4900 & .data$siccd <= 4999 ~ "Utilities",
+      .data$siccd >= 5000 & .data$siccd <= 5199 ~ "Wholesale",
+      .data$siccd >= 5200 & .data$siccd <= 5999 ~ "Retail",
+      .data$siccd >= 6000 & .data$siccd <= 6799 ~ "Finance",
+      .data$siccd >= 7000 & .data$siccd <= 8999 ~ "Services",
+      .data$siccd >= 9000 & .data$siccd <= 9999 ~ "Public",
+      TRUE ~ "Missing"
+    ))
 
   crsp_monthly <- crsp_monthly |>
     dplyr::mutate(ret_adj = dplyr::case_when(
