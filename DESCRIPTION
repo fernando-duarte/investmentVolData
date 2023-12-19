@@ -26,7 +26,10 @@ Imports:
   purrr,
   lubridate,
   frenchdata,
-  rlang
+  rlang,
+  RPostgres,
+  dbplyr,
+  tidyquant
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3

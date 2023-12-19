@@ -1,3 +1,9 @@
+#' Download data from Wharton's WRDS
+#'
+#' `get_wrds()` downloads WRDS data.
+#'
+#' @param start_date Starting date in any format recognized by [lubridate::ymd]
+#' @param end_date Ending date in any format recognized by [lubridate::ymd]
 #' @export get_wrds
 #' @importFrom rlang .data
 get_wrds <- function(
@@ -54,6 +60,12 @@ get_wrds <- function(
       shrout = .data$shrout * 1000
     )
 }
+
+#' `get_wrds()` downloads WRDS data.
+#'
+#' @param data Data downloaded from [investmentVolData::get_wrds]
+#' @param start_date Starting date in any format recognized by [lubridate::ymd]
+#' @param end_date Ending date in any format recognized by [lubridate::ymd]
 #' @export clean_wrds
 #' @importFrom rlang .data
 #' @importFrom lubridate %m+%

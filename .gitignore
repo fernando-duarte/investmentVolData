@@ -41,5 +41,5 @@ vignettes/*.R
 *.utf8.md
 *.knit.md
 # R Environment Variables
-.Renviron
+#.Renviron
 inst/doc

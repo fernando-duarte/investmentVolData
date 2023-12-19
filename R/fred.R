@@ -1,3 +1,10 @@
+#' Download data from the Federal Reserve Bank of St. Louis FRED
+#'
+#' `get_fred()` downloads FRED data.
+#'
+#' @param fred_series A single character string, a character vector or tibble
+#'   representing a single (or multiple) FRED series
+#' @param ... Additional arguments passed to [tidyquant::tq_get].
 #' @export get_fred
 get_fred <- function(
     fred_series = c(
@@ -11,6 +18,12 @@ get_fred <- function(
     ...
   )
 }
+
+#' `clean_fred()` cleans FRED data.
+#'
+#' @param data Data downloaded from [investmentVolData::get_fred]
+#' @param start_date Starting date in any format recognized by [lubridate::ymd]
+#' @param end_date Ending date in any format recognized by [lubridate::ymd]
 #' @export clean_fred
 #' @importFrom rlang .data
 clean_fred <- function(
