@@ -39,12 +39,3 @@ jobs:
           repository: ${{ github.repository }}
           event-type: trigger-workflow-lint
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
-
-
-
-          - name: Install perl, ghostscript, tinytex
-          run: |
-            apt-get update -y
-            apt-get install perl -y
-            apt-get install ghostscript -y
-            wget -qO- "https://yihui.org/tinytex/install-bin-unix.sh" | sh

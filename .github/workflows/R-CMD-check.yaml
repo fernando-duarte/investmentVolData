@@ -31,10 +31,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install libraries
-        if:  ${{ matrix.config.os == 'ubuntu-latest'}}
+        if:  runner.os == 'ubuntu-latest'
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y libcurl4-openssl-dev
+          sudo apt-get install -y libcurl4-openssl-dev libharfbuzz-dev libfribidi-dev
       - uses: r-lib/actions/setup-pandoc@v2
       - uses: r-lib/actions/setup-r@v2
         with:
