@@ -19,3 +19,5 @@ package\.json$
 R/fred.R
 R/wrds.R
 R/temp.R
+^renv$
+^renv\.lock$
