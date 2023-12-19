@@ -43,3 +43,4 @@ vignettes/*.R
 # R Environment Variables
 #.Renviron
 inst/doc
+inst/extdata

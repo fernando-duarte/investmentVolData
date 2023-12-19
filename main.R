@@ -7,6 +7,59 @@ wrds <- clean_wrds(wrds_raw)
 famafrench_raw <- get_famafrench()
 famafrench <- clean_famafrench(famafrench_raw)
 
+library(RSQLite)
+library(dbplyr)
+# create database
+tidy_finance <- dbConnect(
+  SQLite(),
+  "data/all_data.sqlite",
+  extended_types = TRUE
+)
+# save
+dbWriteTable(tidy_finance,
+             "factors_ff3_monthly",
+             value = factors_ff3_monthly,
+             overwrite = TRUE
+)
+dbWriteTable(tidy_finance,
+             "factors_ff3_monthly",
+             value = factors_ff3_monthly,
+             overwrite = TRUE
+)
+dbWriteTable(tidy_finance,
+             "factors_ff3_monthly",
+             value = factors_ff3_monthly,
+             overwrite = TRUE
+)
+
+# load
+library(tidyverse)
+library(RSQLite)
+tidy_finance <- dbConnect(
+  SQLite(),
+  "data/tidy_finance_r.sqlite",
+  extended_types = TRUE
+)
+
+tidy_finance <- dbConnect(
+  SQLite(),
+  "data/all_data.sqlite",
+  extended_types = TRUE
+)
+
+factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
+  select(month, rf) |>
+  collect()
+
+crsp_monthly <- crsp_monthly |>
+  left_join(factors_ff3_monthly,
+            by = "month"
+  ) |>
+  mutate(
+    ret_excess = ret_adj - rf,
+    ret_excess = pmax(ret_excess, -1)
+  ) |>
+  select(-ret_adj, -rf)
 
 # library(RSQLite)
 #

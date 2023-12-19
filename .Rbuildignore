@@ -15,6 +15,8 @@ node_modules$
 package-lock\.json$
 package\.json$
 ^vignettes/articles$
-main.R
 ^renv$
 ^renv\.lock$
+main.R
+create_all_data.R
+^inst/extdata/.+$
