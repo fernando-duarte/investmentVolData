@@ -25,6 +25,8 @@ jobs:
       
       - name: Render Rmarkdown files and Commit Results
         run: |
+          apt-get update -y
+          sudo apt-get install -y libcurl4-openssl-dev
           RMD_PATH=($(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '[.]Rmd$'))
           Rscript -e 'for (f in commandArgs(TRUE)) if (file.exists(f)) rmarkdown::render(f)' ${RMD_PATH[*]}
           git config --local user.name "$GITHUB_ACTOR"
@@ -39,3 +41,12 @@ jobs:
           repository: ${{ github.repository }}
           event-type: trigger-workflow-lint
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+
+
+
+          - name: Install perl, ghostscript, tinytex
+          run: |
+            apt-get update -y
+            apt-get install perl -y
+            apt-get install ghostscript -y
+            wget -qO- "https://yihui.org/tinytex/install-bin-unix.sh" | sh
