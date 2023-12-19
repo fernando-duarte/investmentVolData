@@ -1,4 +1,11 @@
-#'@export get_famafrench
+#' Download data from Kenneth French's data library
+#'
+#' `get_famafrench()` downloads Fama-French 3 Factors.
+#'
+#' @param dataset_names Input vector with names of datasets to download. Either a character vector, or something
+#'  coercible to one.
+#' @param ... Additional arguments passed to [frenchdata::download_french_data].
+#'@export
 get_famafrench <- function(
     dataset_names = c("Fama/French 3 Factors","Fama/French 3 Factors [Daily]"),
     ...
@@ -6,6 +13,14 @@ get_famafrench <- function(
   dataset_names |> purrr::map(\(x) frenchdata::download_french_data(x,...))
 }
 
+#' Cleans data downloaded from Kenneth French's data library
+#' `clean_famafrench()` cleans data downloaded with [investmentVolData::get_famafrench].
+#'
+#' @param data Data in a format returned by `get_famafrench()`.
+#'
+#' @param start_date Date to start the data at.
+#' @param end_date Date to end the data at.
+#'
 #'@export clean_famafrench
 #'@importFrom rlang .data
 clean_famafrench <- function(

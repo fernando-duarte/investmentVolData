@@ -1,6 +1,5 @@
-test_that("Pull FRED returns nonempty data.frame", {
-  testkey <- "7fdf94c38c6355269067736a82bf7874"
-  df <- pull_fred_data(testkey)
-  expect_equal(class(df), c("tbl_df", "tbl", "data.frame"))
-  expect_true(dim(df)[1] > 0 & dim(df)[2] > 0)
+test_that("Pull FRED returns nonempty tibble", {
+  ff <- get_famafrench()
+  expect_equal(class(ff), c("list"))
+  expect_equal(class(ff[[1]]$subsets$data[[1]]),c("spec_tbl_df","tbl_df","tbl","data.frame") )
 })
