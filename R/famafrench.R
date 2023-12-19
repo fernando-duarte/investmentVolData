@@ -5,7 +5,7 @@
 #' @param dataset_names Input vector with names of datasets to download. Either a character vector, or something
 #'  coercible to one.
 #' @param ... Additional arguments passed to [frenchdata::download_french_data].
-#' @export
+#' @export get_famafrench
 get_famafrench <- function(
     dataset_names = c("Fama/French 3 Factors", "Fama/French 3 Factors [Daily]"),
     ...) {

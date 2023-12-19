@@ -2,7 +2,7 @@
 % Please edit documentation in R/wrds.R
 \name{clean_wrds}
 \alias{clean_wrds}
-\title{\code{get_wrds()} downloads WRDS data.}
+\title{\code{clean_wrds()} downloads WRDS data.}
 \usage{
 clean_wrds(data, start_date = "1950-01-01", end_date = "2023-01-01")
 }
@@ -14,5 +14,5 @@ clean_wrds(data, start_date = "1950-01-01", end_date = "2023-01-01")
 \item{end_date}{Ending date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
 }
 \description{
-\code{get_wrds()} downloads WRDS data.
+\code{clean_wrds()} downloads WRDS data.
 }

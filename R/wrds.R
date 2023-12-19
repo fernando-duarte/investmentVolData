@@ -61,7 +61,7 @@ get_wrds <- function(
     )
 }
 
-#' `get_wrds()` downloads WRDS data.
+#' `clean_wrds()` downloads WRDS data.
 #'
 #' @param data Data downloaded from [investmentVolData::get_wrds]
 #' @param start_date Starting date in any format recognized by [lubridate::ymd]
@@ -84,7 +84,7 @@ clean_wrds <- function(
     dplyr::select(.data$permno, .data$month, mktcap_lag = .data$mktcap)
 
   crsp_monthly <- crsp_monthly |>
-    dplyr::left_join(.data$mktcap_lag, by = c("permno", "month"))
+    dplyr::left_join(mktcap_lag, by = c("permno", "month"))
 
   crsp_monthly <- crsp_monthly |>
     dplyr::mutate(exchange = dplyr::case_when(

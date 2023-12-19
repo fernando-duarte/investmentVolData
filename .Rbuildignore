@@ -15,6 +15,6 @@ node_modules$
 package-lock\.json$
 package\.json$
 ^vignettes/articles$
-R/temp.R
+main.R
 ^renv$
 ^renv\.lock$

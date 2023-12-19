@@ -1,3 +1,13 @@
+library(investmentVolData)
+
+fred_raw <- get_fred()
+fred <- clean_fred(fred_raw)
+wrds_raw <- get_wrds()
+wrds <- clean_wrds(wrds_raw)
+famafrench_raw <- get_famafrench()
+famafrench <- clean_famafrench(famafrench_raw)
+
+
 # library(RSQLite)
 #
 # ff <- get_famafrench()
