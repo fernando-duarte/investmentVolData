@@ -9,7 +9,8 @@
 get_fred <- function(
     fred_series = c(
       "GDPC1",
-      "GDPPOT"
+      "GDPPOT",
+      "CPIAUCNS"
     ),
     ...) {
   tidyquant::tq_get(

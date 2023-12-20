@@ -21,15 +21,19 @@ Suggests:
     testdat,
     testthat (>= 3.0.0)
 Imports:
-  dplyr,
-  stringr,
-  purrr,
-  lubridate,
-  frenchdata,
-  rlang,
-  RPostgres,
-  dbplyr,
-  tidyquant
+    dplyr,
+    stringr,
+    purrr,
+    lubridate,
+    frenchdata,
+    rlang,
+    RPostgres,
+    dbplyr,
+    tidyquant,
+    bea.R,
+    magrittr,
+    tidyr,
+    tsibble
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3

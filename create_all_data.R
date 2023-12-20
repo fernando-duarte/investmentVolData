@@ -6,6 +6,8 @@ wrds_raw <- get_wrds()
 wrds <- clean_wrds(wrds_raw)
 famafrench_raw <- get_famafrench()
 famafrench <- clean_famafrench(famafrench_raw)
+bea_raw <- get_bea()
+bea <- clean_bea(bea_raw)
 
 library(RSQLite)
 library(dbplyr)
@@ -29,5 +31,10 @@ dbWriteTable(database,
 dbWriteTable(database,
              "famafrench",
              value = famafrench,
+             overwrite = TRUE
+)
+dbWriteTable(database,
+             "bea",
+             value = bea,
              overwrite = TRUE
 )

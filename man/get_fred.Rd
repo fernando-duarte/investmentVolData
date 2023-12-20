@@ -4,7 +4,7 @@
 \alias{get_fred}
 \title{Download data from the Federal Reserve Bank of St. Louis FRED}
 \usage{
-get_fred(fred_series = c("GDPC1", "GDPPOT"), ...)
+get_fred(fred_series = c("GDPC1", "GDPPOT", "CPIAUCNS"), ...)
 }
 \arguments{
 \item{fred_series}{A single character string, a character vector or tibble
