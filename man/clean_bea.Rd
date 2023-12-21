@@ -2,17 +2,42 @@
 % Please edit documentation in R/bea.R
 \name{clean_bea}
 \alias{clean_bea}
-\title{\code{clean_bea()} downloads WRDS data.}
+\title{\code{clean_bea()} Cleans data downloaded from BEA.}
 \usage{
-clean_bea(data, start_date = "1950-01-01", end_date = "2023-01-01")
+clean_bea(
+  raw_data,
+  lines = c("Private nonresidential fixed assets", "Equipment", "Structures"),
+  start_date = "1950-01-01",
+  end_date = "2023-01-01"
+)
 }
 \arguments{
-\item{data}{Data downloaded from \link{get_bea}}
+\item{raw_data}{Data downloaded from \link{get_bea}}
+
+\item{lines}{Vector of character or integers specifying which lines to keep}
 
 \item{start_date}{Starting date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
 
 \item{end_date}{Ending date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
 }
 \description{
-\code{clean_bea()} downloads WRDS data.
+\code{clean_bea()} Cleans data downloaded from BEA.
+}
+\examples{
+bea_raw <- get_bea()
+clean_bea(bea_raw)
+# Specify lines by name:
+clean_bea(bea_raw, lines = c(
+"Private nonresidential fixed assets",
+"Equipment",
+"Structures"
+)
+)
+# Specify lines by number:
+clean_bea(bea_raw, lines = c(1,2,3))
+# Specify dates:
+clean_bea(bea_raw,
+  start_date = "1950-01-01",
+  end_date = "2023-01-01"
+)
 }

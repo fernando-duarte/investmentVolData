@@ -1,54 +1,35 @@
-library(investmentVolData)
+library(bea.R)
 
-fred_raw <- get_fred()
-fred <- clean_fred(fred_raw)
-wrds_raw <- get_wrds()
-wrds <- clean_wrds(wrds_raw)
-famafrench_raw <- get_famafrench()
-famafrench <- clean_famafrench(famafrench_raw)
+beaSearch('Investment in Private Nonresidential Fixed Assets', Sys.getenv("BEA_API_KEY"), asHtml = TRUE)
 
-library(RSQLite)
-library(dbplyr)
-# create database
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/all_data.sqlite",
-  extended_types = TRUE
-)
-# save
-dbWriteTable(tidy_finance,
-             "factors_ff3_monthly",
-             value = factors_ff3_monthly,
-             overwrite = TRUE
-)
-dbWriteTable(tidy_finance,
-             "factors_ff3_monthly",
-             value = factors_ff3_monthly,
-             overwrite = TRUE
-)
-dbWriteTable(tidy_finance,
-             "factors_ff3_monthly",
-             value = factors_ff3_monthly,
-             overwrite = TRUE
-)
 
-# load
+library(tsibble)
+
+pivot_longer(tbl(all_data, "famafrench"))
+
+ff<-tbl(all_data, "famafrench") |>
+  select(!date) |>
+  collect() |>
+  as_tibble(.name_repair = "universal") |>
+  as_tsibble()
+
+ff %>% as_tsibble(key=)
+
 library(tidyverse)
 library(RSQLite)
-tidy_finance <- dbConnect(
+# load
+all_data <- dbConnect(
   SQLite(),
-  "data/tidy_finance_r.sqlite",
+  "inst/extdata/all_data.sqlite",
   extended_types = TRUE
 )
+dbListTables(all_data)
 
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/all_data.sqlite",
-  extended_types = TRUE
-)
-
-factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
+factors_ff3_monthly <- tbl(all_data, "famafrench") |>
   select(month, rf) |>
+  collect()
+
+crsp_monthly <- tbl(all_data, "wrds")|>
   collect()
 
 crsp_monthly <- crsp_monthly |>
@@ -61,19 +42,66 @@ crsp_monthly <- crsp_monthly |>
   ) |>
   select(-ret_adj, -rf)
 
+crsp_monthly <- crsp_monthly |>
+  drop_na(ret_excess, mktcap, mktcap_lag)
+
+dbWriteTable(all_data,
+             "crsp_monthly",
+             value = crsp_monthly,
+             overwrite = TRUE
+)
+
+library(tidyverse)
+library(scales)
+library(RSQLite)
+library(dbplyr)
+
+crsp_monthly |>
+  count(exchange, date) |>
+  ggplot(aes(x = date, y = n, color = exchange, linetype = exchange)) +
+  geom_line() +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "Monthly number of securities by listing exchange"
+  ) +
+  scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
+  scale_y_continuous(labels = comma)
+
+tbl(all_data, "crsp_monthly") |>
+  left_join(tbl(all_data, "fred"), by = "month") |>
+  group_by(month, exchange) |>
+  summarize(
+    mktcap = sum(mktcap, na.rm = TRUE) / price,
+    .groups = "drop"
+  ) |>
+  collect() |>
+  mutate(month = ymd(month)) |>
+  ggplot(aes(
+    x = month, y = mktcap / 1000,
+    color = exchange, linetype = exchange
+  )) +
+  geom_line() +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "Monthly market cap by listing exchange in billions of Dec 2022 USD"
+  ) +
+  scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
+  scale_y_continuous(labels = comma)
+
+
 # library(RSQLite)
 #
 # ff <- get_famafrench()
 # fred <- get_fred()
 # wrds <- get_wrds()
 #
-# tidy_finance <- dbConnect(
+# all_data <- dbConnect(
 #   SQLite(),
 #   "data/tidy_finance_r.sqlite",
 #   extended_types = TRUE
 # )
 #
-# factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
+# factors_ff3_monthly <- tbl(all_data, "factors_ff3_monthly") |>
 #   select(month, rf) |>
 #   collect()
 #
@@ -90,7 +118,7 @@ crsp_monthly <- crsp_monthly |>
 # crsp_monthly <- crsp_monthly |>
 #   drop_na(ret_excess, mktcap, mktcap_lag)
 #
-# dbWriteTable(tidy_finance,
+# dbWriteTable(all_data,
 #              "crsp_monthly",
 #              value = crsp_monthly,
 #              overwrite = TRUE
@@ -107,8 +135,8 @@ crsp_monthly <- crsp_monthly |>
 #   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
 #   scale_y_continuous(labels = comma)
 #
-# tbl(tidy_finance, "crsp_monthly") |>
-#   left_join(tbl(tidy_finance, "cpi_monthly"), by = "month") |>
+# tbl(all_data, "crsp_monthly") |>
+#   left_join(tbl(all_data, "cpi_monthly"), by = "month") |>
 #   group_by(month, exchange) |>
 #   summarize(
 #     mktcap = sum(mktcap, na.rm = TRUE) / cpi,
@@ -128,7 +156,7 @@ crsp_monthly <- crsp_monthly |>
 #   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
 #   scale_y_continuous(labels = comma)
 #
-# cpi_monthly <- tbl(tidy_finance, "cpi_monthly") |>
+# cpi_monthly <- tbl(all_data, "cpi_monthly") |>
 #   collect()
 #
 # crsp_monthly_industry <- crsp_monthly |>
@@ -158,10 +186,10 @@ crsp_monthly <- crsp_monthly |>
 # ## daily
 # dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
 #
-# factors_ff3_daily <- tbl(tidy_finance, "factors_ff3_daily") |>
+# factors_ff3_daily <- tbl(all_data, "factors_ff3_daily") |>
 #   collect()
 #
-# permnos <- tbl(tidy_finance, "crsp_monthly") |>
+# permnos <- tbl(all_data, "crsp_monthly") |>
 #   distinct(permno) |>
 #   pull()
 #
@@ -213,7 +241,7 @@ crsp_monthly <- crsp_monthly |>
 #       ) |>
 #       select(permno, date, month, ret, ret_excess)
 #
-#     dbWriteTable(tidy_finance,
+#     dbWriteTable(all_data,
 #                  "crsp_daily",
 #                  value = crsp_daily_sub,
 #                  overwrite = ifelse(j == 1, TRUE, FALSE),
@@ -282,7 +310,7 @@ crsp_monthly <- crsp_monthly |>
 #     inv = if_else(at_lag <= 0, as.numeric(NA), inv)
 #   )
 #
-# dbWriteTable(tidy_finance,
+# dbWriteTable(all_data,
 #              "compustat",
 #              value = compustat,
 #              overwrite = TRUE
@@ -310,7 +338,7 @@ crsp_monthly <- crsp_monthly |>
 #
 # crsp_monthly <- crsp_monthly |>
 #   left_join(ccm_links, by = c("permno", "date"))
-# dbWriteTable(tidy_finance,
+# dbWriteTable(all_data,
 #              "crsp_monthly",
 #              value = crsp_monthly,
 #              overwrite = TRUE
@@ -339,3 +367,27 @@ crsp_monthly <- crsp_monthly |>
 #   scale_y_continuous(labels = percent) +
 #   coord_cartesian(ylim = c(0, 1))
 #
+
+
+
+# Plots -------------------------------------------------------------------
+
+
+library(timetk)
+plot_time_series(
+  bea,
+  year,
+  depreciation.K,
+  .title = "Average depreciation rate of physical capital",
+  .smooth = FALSE,
+  .plotly_slider = TRUE
+)
+
+plot_time_series(
+  bea,
+  year,
+  IK,
+  .title = "Gross investment rate",
+  .smooth = FALSE,
+  .plotly_slider = TRUE
+)

@@ -4,13 +4,19 @@
 \alias{get_bea}
 \title{Download data the Bureau of Economic Analysis (BEA)}
 \usage{
-get_bea(start_date = "1950-01-01", end_date = "2023-01-01")
+get_bea(
+  table_names = c(K = "FAAt401", D = "FAAt404", I = "FAAt407"),
+  start_date = "1950-01-01",
+  end_date = "2023-01-01"
+)
 }
 \arguments{
+\item{table_names}{Name of tables to download from BEA.}
+
 \item{start_date}{Starting date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
 
 \item{end_date}{Ending date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
 }
 \description{
-\code{get_bea()} downloads bea data.
+\code{get_bea()} downloads BEA data.
 }

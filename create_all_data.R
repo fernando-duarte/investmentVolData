@@ -1,4 +1,7 @@
 library(investmentVolData)
+library(rlang)
+library(dm)
+library(bea.R)
 
 fred_raw <- get_fred()
 fred <- clean_fred(fred_raw)
@@ -7,7 +10,12 @@ wrds <- clean_wrds(wrds_raw)
 famafrench_raw <- get_famafrench()
 famafrench <- clean_famafrench(famafrench_raw)
 bea_raw <- get_bea()
-bea <- clean_bea(bea_raw)
+bea_clean <- clean_bea(bea_raw)
+bea <- make_vars_bea(bea_clean)
+
+
+
+
 
 library(RSQLite)
 library(dbplyr)
