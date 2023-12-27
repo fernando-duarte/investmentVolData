@@ -1,22 +1,11 @@
-library(bea.R)
-
-beaSearch('Investment in Private Nonresidential Fixed Assets', Sys.getenv("BEA_API_KEY"), asHtml = TRUE)
-
-
-library(tsibble)
-
-pivot_longer(tbl(all_data, "famafrench"))
-
-ff<-tbl(all_data, "famafrench") |>
-  select(!date) |>
-  collect() |>
-  as_tibble(.name_repair = "universal") |>
-  as_tsibble()
-
-ff %>% as_tsibble(key=)
-
 library(tidyverse)
 library(RSQLite)
+library(scales)
+library(tsibble)
+library(fable)
+library(timetk)
+library(ggplot2)
+
 # load
 all_data <- dbConnect(
   SQLite(),
@@ -25,38 +14,108 @@ all_data <- dbConnect(
 )
 dbListTables(all_data)
 
-factors_ff3_monthly <- tbl(all_data, "famafrench") |>
-  select(month, rf) |>
-  collect()
+# # next: add descriptions to bea tibble
+# K = "Physical capital $K$ is the sum of the current-cost net
+# stocks of private non-residential equipment (line 2) and structures (line 3)
+# from the BEA\'s Fixed Asset Tables, Table 4.1., at annual frequency in billions
+# of dollars.",
+# I = "Investment $I$ is the sum of current-dollars gross private
+# investment flows in non-residential equipment (line 2) and structures (line 3)
+# from the BEA\'s Fixed Asset Tables, Table 4.7., at annual frequency in billions
+# of dollars.",
+# IK = "$I/K$"
+# label_I_NIPA <- "$I_{NIPA}$ is the sum of gross private domestic
+# investment in non-residential equipment (line 10) and structures (line 11)
+# from NIPA Table 1.1.5. in current-dollars (billions), at quarterly frequency,
+# seasonally adjusted at annual rates."
+# label_firmK_net <- "$K_{compustat,net}$ is the sum of net property, plan
+# and equipment (variable ppent) over all the firms in our Compustat sample."
+# label_firmK_gross <- "$K_{compustat,gross}$ is the sum of gross property,
+# plan and equipment (variable ppegt) over all the firms in our Compustat sample."
+# label_firmI <- "$I_{compustat}$ is the sum of gross invesment over all
+# firms in our Compustat sample, where gross investment is capital
+# expenditures (variable capx) minus sales of property, plant and equipment (variable sppe)."
+#
+# label_firmIK_net <- "$I_{compustat}/K_{compustat,net}$"
+# label_firmIK_gross <- "$I_{compustat}/K_{compustat,gross}$"
+#
 
-crsp_monthly <- tbl(all_data, "wrds")|>
-  collect()
 
-crsp_monthly <- crsp_monthly |>
-  left_join(factors_ff3_monthly,
-            by = "month"
-  ) |>
-  mutate(
-    ret_excess = ret_adj - rf,
-    ret_excess = pmax(ret_excess, -1)
-  ) |>
-  select(-ret_adj, -rf)
 
-crsp_monthly <- crsp_monthly |>
-  drop_na(ret_excess, mktcap, mktcap_lag)
 
-dbWriteTable(all_data,
-             "crsp_monthly",
-             value = crsp_monthly,
-             overwrite = TRUE
+# BEA data ----------------------------------------------------------------
+bea_st <-  tbl(all_data, "bea") %>%
+  collect() %>%
+  as_tibble()
+
+l1<- gsub('\"', "", "$I_t$", fixed = TRUE)
+vtable::st(bea,
+           vars = c("IK","depreciation.K"),
+           labels = c(
+            "I/K",
+            "Depreciation rate"
+           ),
+           digits = 2,
+           summ=c("mean(x)","sd(x)","min(x)","max(x)","notNA(x)"),
+           summ.names = c("Mean","SD","Min","Max","N"),
+           note = paste0(
+             labelled::get_variable_labels(bea)$K," ",
+             labelled::get_variable_labels(bea)$I
+             ),
+           out="kable",
+           file = "IK.tex"
 )
 
-library(tidyverse)
-library(scales)
-library(RSQLite)
-library(dbplyr)
+bea_ts <-  tbl(all_data, "bea") %>%
+  collect
 
-crsp_monthly |>
+bea %>% select(I,K,date) %>%
+  mutate(across(!date,~ .x)) %>%
+  pivot_longer(c("I","K")) %>%
+  ggplot(aes(x=date,y=value,color=name))+geom_line()
+
+library(latex2exp)
+
+bea %>% select(IK, depreciation.K,date) %>%
+  pivot_longer(c("IK","depreciation.K")) %>%
+  ggplot(aes(x=date,y=value,color=name))+
+  geom_line()+
+  easy_labs() +
+  ylab(NULL)+
+  xlab(NULL)+
+  theme(
+    legend.title=element_blank()) +
+  scale_color_discrete(
+    labels=c(
+      "Depreciation rate",TeX(r"( $I_t / K_{t-1}$ )")
+      )
+    )
+
+# Summary stats -----------------------------------------------------------
+library(vtable)
+
+bea <- tbl(all_data, "bea") %>%  collect()
+compustat_crsp_aggregate <- tbl(all_data, "bea") %>%  collect()
+
+vtable::st(bea_vars,
+           digits = 2,
+           summ=c("mean(x)","sd(x)","min(x)","max(x)","notNA(x)"),
+           summ.names = c("Mean","SD","Min","Max","N"),
+           # labels=c("Federal Funds Rate","log of Real GDP","log of Core PCE Deflator"),
+           title = "Title",
+           note = "\\textbf{Descriptive Statistics for BEA data:} Fixed asset tables.",
+           anchor = "sumstats_for_var",
+           file = "output/tables/bea_sumstats.tex",
+           # align = 'p{.3\\textwidth}ccccccc',
+           # fit.page = '\\textwidth',
+           # note.align = 'p{.3\\textwidth}ccccccc',
+           out = "latex"
+           # out = "viewer"
+)
+
+# Plots -------------------------------------------------------------------
+
+tbl(all_data, "crsp") |>
   count(exchange, date) |>
   ggplot(aes(x = date, y = n, color = exchange, linetype = exchange)) +
   geom_line() +
@@ -67,7 +126,7 @@ crsp_monthly |>
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
 
-tbl(all_data, "crsp_monthly") |>
+tbl(all_data, "crsp") |>
   left_join(tbl(all_data, "fred"), by = "month") |>
   group_by(month, exchange) |>
   summarize(
@@ -89,291 +148,10 @@ tbl(all_data, "crsp_monthly") |>
   scale_y_continuous(labels = comma)
 
 
-# library(RSQLite)
-#
-# ff <- get_famafrench()
-# fred <- get_fred()
-# wrds <- get_wrds()
-#
-# all_data <- dbConnect(
-#   SQLite(),
-#   "data/tidy_finance_r.sqlite",
-#   extended_types = TRUE
-# )
-#
-# factors_ff3_monthly <- tbl(all_data, "factors_ff3_monthly") |>
-#   select(month, rf) |>
-#   collect()
-#
-# crsp_monthly <- crsp_monthly |>
-#   left_join(factors_ff3_monthly,
-#             by = "month"
-#   ) |>
-#   mutate(
-#     ret_excess = ret_adj - rf,
-#     ret_excess = pmax(ret_excess, -1)
-#   ) |>
-#   select(-ret_adj, -rf)
-#
-# crsp_monthly <- crsp_monthly |>
-#   drop_na(ret_excess, mktcap, mktcap_lag)
-#
-# dbWriteTable(all_data,
-#              "crsp_monthly",
-#              value = crsp_monthly,
-#              overwrite = TRUE
-# )
-#
-# crsp_monthly |>
-#   count(exchange, date) |>
-#   ggplot(aes(x = date, y = n, color = exchange, linetype = exchange)) +
-#   geom_line() +
-#   labs(
-#     x = NULL, y = NULL, color = NULL, linetype = NULL,
-#     title = "Monthly number of securities by listing exchange"
-#   ) +
-#   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
-#   scale_y_continuous(labels = comma)
-#
-# tbl(all_data, "crsp_monthly") |>
-#   left_join(tbl(all_data, "cpi_monthly"), by = "month") |>
-#   group_by(month, exchange) |>
-#   summarize(
-#     mktcap = sum(mktcap, na.rm = TRUE) / cpi,
-#     .groups = "drop"
-#   ) |>
-#   collect() |>
-#   mutate(month = ymd(month)) |>
-#   ggplot(aes(
-#     x = month, y = mktcap / 1000,
-#     color = exchange, linetype = exchange
-#   )) +
-#   geom_line() +
-#   labs(
-#     x = NULL, y = NULL, color = NULL, linetype = NULL,
-#     title = "Monthly market cap by listing exchange in billions of Dec 2022 USD"
-#   ) +
-#   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
-#   scale_y_continuous(labels = comma)
-#
-# cpi_monthly <- tbl(all_data, "cpi_monthly") |>
-#   collect()
-#
-# crsp_monthly_industry <- crsp_monthly |>
-#   left_join(cpi_monthly, by = "month") |>
-#   group_by(month, industry) |>
-#   summarize(
-#     securities = n_distinct(permno),
-#     mktcap = sum(mktcap) / mean(cpi),
-#     .groups = "drop"
-#   )
-#
-# crsp_monthly_industry |>
-#   ggplot(aes(
-#     x = month,
-#     y = securities,
-#     color = industry,
-#     linetype = industry
-#   )) +
-#   geom_line() +
-#   labs(
-#     x = NULL, y = NULL, color = NULL, linetype = NULL,
-#     title = "Monthly number of securities by industry"
-#   ) +
-#   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
-#   scale_y_continuous(labels = comma)
-#
-# ## daily
-# dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
-#
-# factors_ff3_daily <- tbl(all_data, "factors_ff3_daily") |>
-#   collect()
-#
-# permnos <- tbl(all_data, "crsp_monthly") |>
-#   distinct(permno) |>
-#   pull()
-#
-# batch_size <- 500
-# batches <- ceiling(length(permnos) / batch_size)
-#
-# for (j in 1:batches) {
-#
-#   permno_batch <- permnos[
-#     ((j - 1) * batch_size + 1):min(j * batch_size, length(permnos))
-#   ]
-#
-#   crsp_daily_sub <- dsf_db |>
-#     filter(permno %in% permno_batch &
-#              date >= start_date & date <= end_date) |>
-#     select(permno, date, ret) |>
-#     collect() |>
-#     drop_na()
-#
-#   if (nrow(crsp_daily_sub) > 0) {
-#
-#     msedelist_sub <- msedelist_db |>
-#       filter(permno %in% permno_batch) |>
-#       select(permno, dlstdt, dlret) |>
-#       collect() |>
-#       drop_na()
-#
-#     crsp_daily_sub <- crsp_daily_sub |>
-#       left_join(msedelist_sub, by = c("permno", "date"="dlstdt")) |>
-#       bind_rows(msedelist_sub |>
-#                   anti_join(crsp_daily_sub,
-#                             by = c("permno", "dlstdt" = "date"))) |>
-#       mutate(ret = if_else(!is.na(dlret), dlret, ret),
-#              date = if_else(!is.na(dlstdt), dlstdt, date)) |>
-#       select(-c(dlret, dlstdt)) |>
-#       left_join(msedelist_sub |>
-#                   select(permno, dlstdt), by = "permno") |>
-#       mutate(dlstdt = replace_na(dlstdt, end_date)) |>
-#       filter(date <= dlstdt) |>
-#       select(-dlstdt)
-#
-#     crsp_daily_sub <- crsp_daily_sub |>
-#       mutate(month = floor_date(date, "month")) |>
-#       left_join(factors_ff3_daily |>
-#                   select(date, rf), by = "date") |>
-#       mutate(
-#         ret_excess = ret - rf,
-#         ret_excess = pmax(ret_excess, -1)
-#       ) |>
-#       select(permno, date, month, ret, ret_excess)
-#
-#     dbWriteTable(all_data,
-#                  "crsp_daily",
-#                  value = crsp_daily_sub,
-#                  overwrite = ifelse(j == 1, TRUE, FALSE),
-#                  append = ifelse(j != 1, TRUE, FALSE)
-#     )
-#   }
-#
-#   cat("Batch", j, "out of", batches, "done (", percent(j / batches), ")\n")
-# }
-#
-# # compustat
-# funda_db <- tbl(wrds, in_schema("comp", "funda"))
-# compustat <- funda_db |>
-#   filter(
-#     indfmt == "INDL" &
-#       datafmt == "STD" &
-#       consol == "C" &
-#       datadate >= start_date & datadate <= end_date
-#   ) |>
-#   select(
-#     gvkey, # Firm identifier
-#     datadate, # Date of the accounting data
-#     seq, # Stockholders' equity
-#     ceq, # Total common/ordinary equity
-#     at, # Total assets
-#     lt, # Total liabilities
-#     txditc, # Deferred taxes and investment tax credit
-#     txdb, # Deferred taxes
-#     itcb, # Investment tax credit
-#     pstkrv, # Preferred stock redemption value
-#     pstkl, # Preferred stock liquidating value
-#     pstk, # Preferred stock par value
-#     capx, # Capital investment
-#     oancf, # Operating cash flow
-#     sale,  # Revenue
-#     cogs, # Costs of goods sold
-#     xint, # Interest expense
-#     xsga # Selling, general, and administrative expenses
-#   ) |>
-#   collect()
-#
-# compustat <- compustat |>
-#   mutate(
-#     be = coalesce(seq, ceq + pstk, at - lt) +
-#       coalesce(txditc, txdb + itcb, 0) -
-#       coalesce(pstkrv, pstkl, pstk, 0),
-#     be = if_else(be <= 0, as.numeric(NA), be),
-#     op = (sale - coalesce(cogs, 0) -
-#             coalesce(xsga, 0) - coalesce(xint, 0)) / be,
-#   )
-#
-# compustat <- compustat |>
-#   mutate(year = year(datadate)) |>
-#   group_by(gvkey, year) |>
-#   filter(datadate == max(datadate)) |>
-#   ungroup()
-#
-# compustat <- compustat |>
-#   left_join(
-#     compustat |>
-#       select(gvkey, year, at_lag = at) |>
-#       mutate(year = year + 1), by = c("gvkey", "year")
-#   ) |>
-#   mutate(
-#     inv = at / at_lag - 1,
-#     inv = if_else(at_lag <= 0, as.numeric(NA), inv)
-#   )
-#
-# dbWriteTable(all_data,
-#              "compustat",
-#              value = compustat,
-#              overwrite = TRUE
-# )
-#
-# #Merging CRSP with Compustat
-# ccmxpf_linktable_db <- tbl(
-#   wrds,
-#   in_schema("crsp", "ccmxpf_linktable")
-# )
-# ccmxpf_linktable <- ccmxpf_linktable_db |>
-#   filter(linktype %in% c("LU", "LC") &
-#            linkprim %in% c("P", "C") &
-#            usedflag == 1) |>
-#   select(permno = lpermno, gvkey, linkdt, linkenddt) |>
-#   collect() |>
-#   mutate(linkenddt = replace_na(linkenddt, today()))
-#
-# ccm_links <- crsp_monthly |>
-#   inner_join(ccmxpf_linktable,
-#              by = "permno", relationship = "many-to-many") |>
-#   filter(!is.na(gvkey) &
-#            (date >= linkdt & date <= linkenddt)) |>
-#   select(permno, gvkey, date)
-#
-# crsp_monthly <- crsp_monthly |>
-#   left_join(ccm_links, by = c("permno", "date"))
-# dbWriteTable(all_data,
-#              "crsp_monthly",
-#              value = crsp_monthly,
-#              overwrite = TRUE
-# )
-# crsp_monthly |>
-#   group_by(permno, year = year(month)) |>
-#   filter(date == max(date)) |>
-#   ungroup() |>
-#   left_join(compustat, by = c("gvkey", "year")) |>
-#   group_by(exchange, year) |>
-#   summarize(
-#     share = n_distinct(permno[!is.na(be)]) / n_distinct(permno),
-#     .groups = "drop"
-#   ) |>
-#   ggplot(aes(
-#     x = year,
-#     y = share,
-#     color = exchange,
-#     linetype = exchange
-#   )) +
-#   geom_line() +
-#   labs(
-#     x = NULL, y = NULL, color = NULL, linetype = NULL,
-#     title = "Share of securities with book equity values by exchange"
-#   ) +
-#   scale_y_continuous(labels = percent) +
-#   coord_cartesian(ylim = c(0, 1))
-#
 
 
 
-# Plots -------------------------------------------------------------------
 
-
-library(timetk)
 plot_time_series(
   bea,
   year,
@@ -391,3 +169,4 @@ plot_time_series(
   .smooth = FALSE,
   .plotly_slider = TRUE
 )
+

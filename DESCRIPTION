@@ -29,11 +29,12 @@ Imports:
     rlang,
     RPostgres,
     dbplyr,
-    tidyquant,
     bea.R,
     magrittr,
     tidyr,
-    tsibble
+    scales,
+    fredr,
+    tibble
 VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3

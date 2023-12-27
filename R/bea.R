@@ -13,13 +13,13 @@ get_bea <- function(
       D='FAAt404',    #Table 4.4. Current-Cost Depreciation of Private Nonresidential Fixed Assets
       I='FAAt407'     #Table 4.7. Investment in Private Nonresidential Fixed Assets
     ),
-    start_date = "1950-01-01",
-    end_date = "2023-01-01") {
+    start_date = "1974-01-01",
+    end_date = "2023-12-01") {
   start_date <- lubridate::ymd(start_date)
   end_date <- lubridate::ymd(end_date)
 
   beaSpec <- \(table_name) list(
-    'UserID' = Sys.getenv("BEA_API_KEY") ,
+    'UserID' = Sys.getenv("BEA_API_KEY"),
     'Method' = 'GetData',
     'datasetname' = 'FixedAssets',
     'TableName' = table_name,
@@ -74,12 +74,13 @@ clean_bea <- function(
                                           ) %>%
                             tidyr::pivot_longer(
                               dplyr::starts_with("DataValue_"),
-                              names_to = c(".value", "year"),
+                              names_to = c(".value", "date"),
                               names_sep = "_",
-                              names_transform = list(year = \(x) lubridate::ymd(x, truncated = 2))
+                              names_transform = list(date = \(x) lubridate::ymd(x, truncated = 2)),
+                              values_transform = \(x) x*10^6/10^9,
                             ) %>%
                             dplyr::select(
-                              dplyr::all_of(c("LineDescription", "DataValue", "year", "UNIT_MULT"))
+                              dplyr::all_of(c("LineDescription", "DataValue", "date", "UNIT_MULT"))
                             ) %>%
                             tidyr::pivot_wider(
                               names_from = "LineDescription",
@@ -87,11 +88,10 @@ clean_bea <- function(
                             ) %>%
                             dplyr::rename_with(
                               ~ stringr::str_glue("{(.)}.{name}"),
-                              .cols = -c("year")
-                            ) %>%
-                            tsibble::as_tsibble()
+                              .cols = -c("date")
+                            )
   ) %>%
-    purrr::reduce(dplyr::inner_join, by = "year")
+    purrr::reduce(dplyr::inner_join, by = "date")
 }
 
 #' `make_vars_bea()` constructs variables from cleaned BEA data.
@@ -111,26 +111,59 @@ make_vars_bea <- function(
     clean_data,
     nu = 1/2
 ) {
-  clean_data %>%
+  list(
+    data = (clean_data %>%
     dplyr::mutate(
-  K = .data$Equipment.K + .data$Structures.K,
-  lag.K = dplyr::lag(.data$K, order_by = .data$year),
-  lag.Equipment.K = dplyr::lag(.data$Equipment.K, order_by = .data$year),
-  lag.Structures.K = dplyr::lag(.data$Structures.K, order_by = .data$year),
-  I = .data$Equipment.I+.data$Structures.I,
-  IK = .data$I/.data$lag.K,
-  IK.Equipment = .data$Equipment.I/ .data$lag.Equipment.K,
-  IK.Structures = .data$Structures.I/ .data$lag.Structures.K,
-  IK = .data$I/.data$lag.K,
-  depreciation.Equipment = .data$Equipment.D/ (.data$lag.Equipment.K + nu * .data$Equipment.I),
-  depreciation.Structures = .data$Structures.D/ (.data$lag.Structures.K + nu * .data$Structures.I),
-  depreciation.K = (.data$lag.Equipment.K/.data$lag.K) * .data$depreciation.Equipment + (.data$lag.Structures.K/.data$lag.K) * .data$depreciation.Structures
-)
+        K = .data$Equipment.K + .data$Structures.K,
+        lag.K = dplyr::lag(.data$K, order_by = .data$date),
+        lag.Equipment.K = dplyr::lag(.data$Equipment.K, order_by = .data$date),
+        lag.Structures.K = dplyr::lag(.data$Structures.K, order_by = .data$date),
+        I = .data$Equipment.I+.data$Structures.I,
+        IK = .data$I/.data$lag.K,
+        IK.Equipment = .data$Equipment.I/ .data$lag.Equipment.K,
+        IK.Structures = .data$Structures.I/ .data$lag.Structures.K,
+        IK = .data$I/.data$lag.K,
+        depreciation.Equipment = .data$Equipment.D/ (.data$lag.Equipment.K + nu * .data$Equipment.I),
+        depreciation.Structures = .data$Structures.D/ (.data$lag.Structures.K + nu * .data$Structures.I),
+        depreciation.K = (.data$lag.Equipment.K/.data$lag.K) * .data$depreciation.Equipment + (.data$lag.Structures.K/.data$lag.K) * .data$depreciation.Structures
+    )),
+  metadata = dplyr::tibble(
+      id = c(
+        "Private nonresidential fixed assets.I",
+        "Equipment.I",
+        "Structures.I"
+      ),
+      realtime_start = as.character(lubridate::today()),
+      realtime_end = as.character(lubridate::today()),
+      title = c(
+        "Current-Cost Gross Investment of Fixed Assets: Private: Nonresidential",
+        "Current-Cost Gross Investment of Fixed Assets: Private: Nonresidential: Equipment",
+        "Current-Cost Gross Investment of Fixed Assets: Private: Nonresidential: Structures"
+      ),
+      observation_start = (clean_data %>%
+        dplyr::select("date","Private nonresidential fixed assets.I") %>%
+        tidyr::drop_na() %>%
+        dplyr::summarize(min_date=min(date)) %>%
+        tibble::deframe() %>%
+        as.character()),
+      observation_end = (clean_data %>%
+        dplyr::select("date","Private nonresidential fixed assets.I") %>%
+        tidyr::drop_na() %>%
+        dplyr::summarize(max_date=max(date)) %>%
+        tibble::deframe() %>%
+        as.character()),
+      frequency = "Annual",
+      frequency_short = "A",
+      units = "Billions of Dollars",
+      units_short = "Bil. of $",
+      seasonal_adjustment = "Not Seasonally Adjusted",
+      seasonal_adjustment_short = "NSA",
+      last_updated = paste0( as.character(lubridate::today())," 00:00:00-06"),
+      notes = paste("Fixed Assets Table 4.7", utils::URLencode("https://www.bea.gov/itable/fixed-assets")),
+      source = "BEA"
+    )
+  )
+
 }
 
 
-## Notes
-# Kstruct,t is the current-cost net stock of non-residential structures (from Fixed assets Table 4.1)
-# We use the data provided in Fixed Assets tables 4.1 (for the net stocks at current cost) and 4.7 (for the gross investment flows at current cost). For physical capital, we use the sum of equipment and structures, and for intangible capital
-#Dtc is the estimate of current-cost depreciation reported in Fixed Assets table 4.4,
-#current-cost average depreciation estimate

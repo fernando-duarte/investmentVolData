@@ -24,24 +24,28 @@ get_famafrench <- function(
 #' @importFrom rlang .data
 clean_famafrench <- function(
     data,
-    start_date = "1950-01-01",
-    end_date = "2023-01-01") {
+    start_date = "1974-01-01",
+    end_date = "2023-12-01") {
   start_date <- lubridate::ymd(start_date)
   end_date <- lubridate::ymd(end_date)
+  list(
+    monthly =
   data[[1]]$subsets$data[[1]] |>
     dplyr::mutate(
       month = lubridate::floor_date(lubridate::ymd(stringr::str_c(date, "01")), "month")
     ) |>
     dplyr::rename_with(stringr::str_to_lower) |>
     dplyr::filter(.data$month >= start_date & .data$month <= end_date)
+  ,
+  daily =
+  data[[2]]$subsets$data[[1]] |>
+    dplyr::mutate(
+      date = lubridate::ymd(date),
+      dplyr::across(c("RF", "Mkt-RF", "SMB", "HML"), ~as.numeric(.) / 100),
+      .keep = "none"
+    ) |>
+    dplyr::rename_with(stringr::str_to_lower) |>
+    dplyr::filter(.data$date >= start_date & .data$date <= end_date)
+  )
 }
-#
-#   raw <- frenchdata::download_french_data(dataset_name)
-#   raw$subsets$data[[1]] |>
-#     dplyr::mutate(
-#       month = lubridate::floor_date(lubridate::ymd(stringr::str_c(date, "01")), "month"),
-#       .keep = "none"
-#     ) |>
-#     dplyr::rename_with(stringr::str_to_lower) |>
-#     dplyr::filter(month >= start_date & month <= end_date)
-# }
+
