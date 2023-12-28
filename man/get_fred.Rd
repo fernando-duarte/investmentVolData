@@ -5,11 +5,11 @@
 \title{Download data from the Federal Reserve Bank of St. Louis FRED}
 \usage{
 get_fred(
-  series_id = c("GDPC1", "GDPPOT", "CPIAUCNS", "PNFI", "B009RC1Q027SBEA",
-    "B009RC1A027NBEA", "NA000339Q", "Y033RC1Q027SBEA", "Y033RC1A027NBEA", "NA000340Q",
-    "K1NTOTL1ST000", "K1NTOTL1EQ000", "M1NTOTL1EQ000", "M1NTOTL1ST000"),
-  start_date = "1950-01-01",
-  end_date = "2023-01-01",
+  series_id = c("GDPC1", "PNFI", "B009RC1Q027SBEA", "B009RC1A027NBEA", "NA000339Q",
+    "Y033RC1Q027SBEA", "Y033RC1A027NBEA", "NA000340Q", "K1NTOTL1ST000", "K1NTOTL1EQ000",
+    "M1NTOTL1EQ000", "M1NTOTL1ST000"),
+  start_date = "1940-01-01",
+  end_date = "2023-12-31",
   ...
 )
 }

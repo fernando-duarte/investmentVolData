@@ -4,7 +4,7 @@
 \alias{get_crsp}
 \title{Download data from CRSP using Wharton's WRDS}
 \usage{
-get_crsp(start_date = "1974-01-01", end_date = "2023-12-01")
+get_crsp(start_date = "1940-01-01", end_date = "2023-12-31")
 }
 \arguments{
 \item{start_date}{Starting date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}

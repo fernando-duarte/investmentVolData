@@ -7,8 +7,8 @@
 clean_bea(
   raw_data,
   lines = c("Private nonresidential fixed assets", "Equipment", "Structures"),
-  start_date = "1950-01-01",
-  end_date = "2023-01-01"
+  start_date = "1940-01-01",
+  end_date = "2023-12-31"
 )
 }
 \arguments{

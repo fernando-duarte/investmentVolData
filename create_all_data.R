@@ -2,16 +2,12 @@ library(investmentVolData)
 library(tidyverse)
 
 fred <- get_fred()
-
 bea_raw <- get_bea()
 bea_clean <- clean_bea(bea_raw)
 bea <- make_vars_bea(bea_clean)
 
-
-
 metadata <- fred$metadata %>%
   rows_append(bea$metadata)
-
 
 famafrench_raw <- get_famafrench()
 famafrench <- clean_famafrench(famafrench_raw)
@@ -55,21 +51,20 @@ crsp_compustat <- crsp_monthly |>
       ! dplyr::between(.data$sic, 60, 69) & # finance and real estate
       ! dplyr::between(.data$sic, 90, 99) # public administration
   )
-#  drop_na("sic")
-# 2-digit SIC code not missing;
+#  drop_na("sic") to drop if 2-digit SIC code is missing
 
-# Select Compustat's SICH as primary SIC code, if not available     */
-# /* then use CRSP's historical SICCD
+# Select Compustat's SICH as primary SIC code,
+# If not available then use CRSP's historical SICCD
 # coalesce(a.sich,d.siccd) as sic
-#
 
 crsp_compustat_agregate <- crsp_compustat %>% dplyr::mutate(
   firmI = capx - sppe, #Gross investment in physical capital is computed as capital expenditures minus sales of property, plant and equipment
-  firmK_gross = ppegt, # Property, Plant and Equipment - Total (Gross)
-  firmK_net = ppent, # Property, Plant and Equipment - Total (Net)
+  firmK_gross = na_if(ppegt,0), # Property, Plant and Equipment - Total (Gross)
+  firmK_net = na_if(ppent,0), # Property, Plant and Equipment - Total (Net)
   firmIK_gross = firmI/firmK_gross,
   firmIK_net = firmI/firmK_net
 ) %>%
+  drop_na(firmIK_gross,firmIK_net) %>%
   dplyr::group_by(year,quarter) %>%
   dplyr::summarize(
     firmI = sum(firmI, na.rm = TRUE),
@@ -81,13 +76,8 @@ crsp_compustat_agregate <- crsp_compustat %>% dplyr::mutate(
   ) %>%
   ungroup() %>%
   mutate(
-    date = lubridate::ymd(paste0(.data$year,"-",.data$quarter * 3,"-","01"))
+    date = lubridate::ymd(paste0(.data$year,"-",.data$quarter * 3 - 2 ,"-","01"))
   )
-
-# dplyr::mutate(month = lubridate::floor_date(.data$date, "month"))
-#
-# crsp_compustat_agregate %>% left_join(bea, by = c("year"))
-
 
 # Stock market indices return and vol --------------------------------
 
@@ -114,6 +104,19 @@ crsp_indices <- timetk::summarize_by_time(
 ) %>%
   #remove column if all NA
   dplyr::select_if(~ !all(is.na(.)))
+
+# Merge everything --------------------------------------------------------
+
+ts <- variables <- purrr::reduce(
+  list(
+    pivot_wider(fred$data,names_from = label,values_from=value,id_cols=date) ,
+    bea$data %>% select(!starts_with("UNIT_MULT")),
+    crsp_compustat_agregate%>% select(-c("year","quarter")),
+    crsp_indices %>% select(!ends_with("end_of_period"))
+    ),
+  dplyr::full_join,
+  by = "date"
+  )
 
 
 # Save to database --------------------------------------------------------

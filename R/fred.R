@@ -11,11 +11,9 @@
 get_fred <- function(
     series_id= c(
       "GDPC1",
-      "GDPPOT",
-      "CPIAUCNS",
       "PNFI",
 
-      ##National Income and Product Accounts
+      ##National Income and Product Accounts (NIPA)
       #Private fixed investment: Nonresidential: Structures
       "B009RC1Q027SBEA", #Seasonally Adjusted, Quarterly
       "B009RC1A027NBEA", #Annual"
@@ -26,7 +24,7 @@ get_fred <- function(
       "Y033RC1A027NBEA", #Annual
       "NA000340Q",#Not Seasonally Adjusted, Quarterly
 
-      ##Fixed Assets Accounts Tables
+      ##Fixed Assets Accounts Tables (FA)
       #Table 4.1.
       #Current-Cost Net Stock of Fixed Assets: Private: Nonresidential: Structures
       "K1NTOTL1ST000",#Annual
@@ -38,9 +36,24 @@ get_fred <- function(
       #Current-Cost Depreciation of Fixed Assets: Private: Nonresidential: Structures
       "M1NTOTL1ST000"
     ),
-    start_date = "1950-01-01",
-    end_date = "2023-01-01",
+    start_date = "1940-01-01",
+    end_date = "2023-12-31",
     ...) {
+  # user-friendly names
+  lookup <- c(
+    gdp = "GDPC1",
+    pnfi = "PNFI",
+    NIPA.Structures.I.SA = "B009RC1Q027SBEA",
+    NIPA.Structures.I.NSA = "NA000339Q",
+    NIPA.Structures.I = "B009RC1A027NBEA",
+    NIPA.Equipment.I.SA = "Y033RC1Q027SBEA",
+    NIPA.Equipment.I.NSA = "NA000340Q",
+    NIPA.Equipment.I = "Y033RC1A027NBEA",
+    FA.Structures.K = "K1NTOTL1ST000",
+    FA.Equipment.K = "K1NTOTL1EQ000",
+    FA.Equipment.D = "M1NTOTL1EQ000",
+    FA.Structures.D = "M1NTOTL1ST000"
+  )
   list(
     data = purrr::pmap_dfr(
       .l = list(
@@ -51,7 +64,13 @@ get_fred <- function(
         observation_start = as.Date(start_date),
         observation_end = as.Date(end_date)
         )
-    ),
+    ) %>%
+      dplyr::left_join(
+        tibble::as_tibble_col(lookup, column_name = "series_id") %>% tibble::add_column(label = names(lookup)),
+        by = c("series_id"),
+        relationship = "many-to-one"
+      )
+    ,
     metadata = purrr::map_dfr(
       .x = series_id,
       .f = \(x) fredr::fredr_series(x)
@@ -68,7 +87,11 @@ get_fred <- function(
     ) %>%
       dplyr::mutate(
         source = "FRED"
-      )
-
+      ) %>%
+      dplyr::left_join(
+        tibble::as_tibble_col(lookup, column_name = "id") %>% tibble::add_column(label = names(lookup)),
+        by = c("id")
+      ) %>%
+      dplyr::relocate("id", "label")
   )
 }

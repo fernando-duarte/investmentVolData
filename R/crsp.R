@@ -7,8 +7,8 @@
 #' @export get_crsp
 #' @importFrom rlang .data
 get_crsp <- function(
-    start_date = "1974-01-01",
-    end_date = "2023-12-01") {
+    start_date = "1940-01-01",
+    end_date = "2023-12-31") {
   start_date <- lubridate::ymd(start_date)
   end_date <- lubridate::ymd(end_date)
   wrds <- RPostgres::dbConnect(
@@ -73,8 +73,8 @@ get_crsp <- function(
 #' @importFrom lubridate %m+%
 clean_crsp <- function(
     data,
-    start_date = "1974-01-01",
-    end_date = "2023-12-01",
+    start_date = "1940-01-01",
+    end_date = "2023-12-31",
     rf = NULL) {
   crsp_monthly <- data |>
     dplyr::mutate(
@@ -151,8 +151,8 @@ clean_crsp <- function(
 #' @export get_crsp_daily
 #' @importFrom rlang .data
 get_crsp_daily <- function(
-    start_date = "1974-01-01",
-    end_date = "2023-12-01",
+    start_date = "1940-01-01",
+    end_date = "2023-12-31",
     rf = NULL,
     permnos = NULL,
     batch_size = 500) {
@@ -288,8 +288,8 @@ get_crsp_daily <- function(
 #' @export get_crsp_indices_daily
 #' @importFrom rlang .data
 get_crsp_indices_daily <- function(
-    start_date = "1974-01-01",
-    end_date = "2023-01-01"
+    start_date = "1940-01-01",
+    end_date = "2023-12-31"
    ) {
 
   wrds <- RPostgres::dbConnect(

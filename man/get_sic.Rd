@@ -4,7 +4,7 @@
 \alias{get_sic}
 \title{\code{get_sic()} downloads link table between gvkey and sic}
 \usage{
-get_sic(start_date = "1974-01-01", end_date = "2023-01-01")
+get_sic(start_date = "1940-01-01", end_date = "2023-12-31")
 }
 \arguments{
 \item{start_date}{Starting date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}

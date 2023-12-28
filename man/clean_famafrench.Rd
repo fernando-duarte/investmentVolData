@@ -5,7 +5,7 @@
 \title{Cleans data downloaded from Kenneth French's data library
 \code{clean_famafrench()} cleans data downloaded with \link{get_famafrench}.}
 \usage{
-clean_famafrench(data, start_date = "1974-01-01", end_date = "2023-12-01")
+clean_famafrench(data, start_date = "1940-01-01", end_date = "2023-12-31")
 }
 \arguments{
 \item{data}{Data in a format returned by \code{get_famafrench()}.}

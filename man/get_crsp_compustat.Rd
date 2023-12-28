@@ -7,8 +7,8 @@ Merged table and merge CRSP and Compustat}
 \usage{
 get_crsp_compustat(
   crsp_monthly,
-  start_date = "1974-01-01",
-  end_date = "2023-12-01"
+  start_date = "1940-01-01",
+  end_date = "2023-12-31"
 )
 }
 \arguments{

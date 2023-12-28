@@ -4,7 +4,7 @@
 \alias{clean_crsp}
 \title{\code{clean_crsp()} downloads WRDS data.}
 \usage{
-clean_crsp(data, start_date = "1974-01-01", end_date = "2023-12-01", rf = NULL)
+clean_crsp(data, start_date = "1940-01-01", end_date = "2023-12-31", rf = NULL)
 }
 \arguments{
 \item{data}{Data downloaded from \link{get_crsp}}

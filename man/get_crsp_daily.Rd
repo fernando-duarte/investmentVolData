@@ -5,8 +5,8 @@
 \title{\code{get_crsp_daily()} downloads daily frequency data from CRSP}
 \usage{
 get_crsp_daily(
-  start_date = "1974-01-01",
-  end_date = "2023-12-01",
+  start_date = "1940-01-01",
+  end_date = "2023-12-31",
   rf = NULL,
   permnos = NULL,
   batch_size = 500

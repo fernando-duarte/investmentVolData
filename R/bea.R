@@ -13,8 +13,8 @@ get_bea <- function(
       D='FAAt404',    #Table 4.4. Current-Cost Depreciation of Private Nonresidential Fixed Assets
       I='FAAt407'     #Table 4.7. Investment in Private Nonresidential Fixed Assets
     ),
-    start_date = "1974-01-01",
-    end_date = "2023-12-01") {
+    start_date = "1940-01-01",
+    end_date = "2023-12-31") {
   start_date <- lubridate::ymd(start_date)
   end_date <- lubridate::ymd(end_date)
 
@@ -63,8 +63,8 @@ clean_bea <- function(
       "Equipment",
       "Structures"
     ),
-    start_date = "1950-01-01",
-    end_date = "2023-01-01"
+    start_date = "1940-01-01",
+    end_date = "2023-12-31"
     ) {
   raw_data %>% purrr::imap(\(value,name)
                           value %>%
@@ -129,9 +129,15 @@ make_vars_bea <- function(
     )),
   metadata = dplyr::tibble(
       id = c(
-        "Private nonresidential fixed assets.I",
-        "Equipment.I",
-        "Structures.I"
+        "i3ntotl1es00",
+        "i3ntotl1eq00",
+        "i3ntotl1st00"
+      ),
+      label = c(
+        # FA = Fixed Asset Tables
+        "FA.PNFA.I",
+        "FA.Equipment.I",
+        "FA.Structures.I"
       ),
       realtime_start = as.character(lubridate::today()),
       realtime_end = as.character(lubridate::today()),

@@ -4,7 +4,7 @@
 \alias{get_crsp_indices_daily}
 \title{\code{get_crsp_indices_daily()} downloads daily frequency stock market indices from CRSP}
 \usage{
-get_crsp_indices_daily(start_date = "1974-01-01", end_date = "2023-01-01")
+get_crsp_indices_daily(start_date = "1940-01-01", end_date = "2023-12-31")
 }
 \arguments{
 \item{start_date}{Starting date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}

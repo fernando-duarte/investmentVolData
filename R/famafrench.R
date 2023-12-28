@@ -24,8 +24,8 @@ get_famafrench <- function(
 #' @importFrom rlang .data
 clean_famafrench <- function(
     data,
-    start_date = "1974-01-01",
-    end_date = "2023-12-01") {
+    start_date = "1940-01-01",
+    end_date = "2023-12-31") {
   start_date <- lubridate::ymd(start_date)
   end_date <- lubridate::ymd(end_date)
   list(

@@ -6,8 +6,8 @@
 \usage{
 get_bea(
   table_names = c(K = "FAAt401", D = "FAAt404", I = "FAAt407"),
-  start_date = "1974-01-01",
-  end_date = "2023-12-01"
+  start_date = "1940-01-01",
+  end_date = "2023-12-31"
 )
 }
 \arguments{

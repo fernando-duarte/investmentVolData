@@ -4,7 +4,7 @@
 \alias{clean_compustat}
 \title{\code{clean_compustat()} cleans Compustat data.}
 \usage{
-clean_compustat(data, start_date = "1974-01-01", end_date = "2023-01-01")
+clean_compustat(data, start_date = "1940-01-01", end_date = "2023-12-31")
 }
 \arguments{
 \item{data}{Data downloaded from \link{get_compustat}}

@@ -7,8 +7,8 @@
 #' @export get_compustat
 #' @importFrom rlang .data
 get_compustat <- function(
-    start_date = "1974-01-01",
-    end_date = "2023-12-01") {
+    start_date = "1940-01-01",
+    end_date = "2023-12-31") {
 
   wrds <- RPostgres::dbConnect(
     RPostgres::Postgres(),
@@ -95,8 +95,8 @@ get_compustat <- function(
 #' @importFrom lubridate %m+%
 clean_compustat <- function(
     data,
-    start_date = "1974-01-01",
-    end_date = "2023-01-01") {
+    start_date = "1940-01-01",
+    end_date = "2023-12-31") {
 
   compustat <- data |>
     # keep only the last available information for each firm-year group
@@ -171,8 +171,8 @@ clean_compustat <- function(
 #' @export get_sic
 #' @importFrom rlang .data
 get_sic <- function(
-    start_date = "1974-01-01",
-    end_date = "2023-01-01") {
+    start_date = "1940-01-01",
+    end_date = "2023-12-31") {
 
   wrds <- RPostgres::dbConnect(
     RPostgres::Postgres(),
