@@ -131,8 +131,13 @@ database <- RSQLite::dbConnect(
 )
 # save
 RSQLite::dbWriteTable(database,
+                      "ts",
+                      value = ts,
+                      overwrite = TRUE
+)
+RSQLite::dbWriteTable(database,
              "fred",
-             value = fred,
+             value = fred$data,
              overwrite = TRUE
 )
 RSQLite::dbWriteTable(database,
@@ -147,7 +152,7 @@ RSQLite::dbWriteTable(database,
 )
 RSQLite::dbWriteTable(database,
              "bea",
-             value = bea,
+             value = bea$data,
              overwrite = TRUE
 )
 RSQLite::dbWriteTable(database,
@@ -173,9 +178,3 @@ dbWriteTable(database,
 dbDisconnect(database)
 
 
-
-
-purrr::map(c(
-  "dplyr","stringr","purrr","lubridate","frenchdata","rlang","RPostgres","dbplyr","bea.R","magrittr","tidyr","scales","fredr"
-),
-\(x) utils::install.packages(x) )
