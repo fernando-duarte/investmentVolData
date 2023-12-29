@@ -38,7 +38,7 @@ get_crsp <- function(
     dplyr::mutate(month = lubridate::floor_date(.data$date, "month")) |>
     dplyr::left_join(
       msedelist_db |>
-        dplyr::select(.data$permno, .data$dlstdt, .data$dlret, .data$dlstcd) |>
+        dplyr::select(.data$permno, .data$dlstdt, .data$dlret, .data$dlstcd, .data$dlprc) |>
         dplyr::mutate(month = lubridate::floor_date(.data$dlstdt, "month")),
       by = c("permno", "month")
     ) |>
@@ -52,7 +52,8 @@ get_crsp <- function(
       .data$exchcd, # Exchange code
       .data$siccd, # Industry code
       .data$dlret, # Delisting return
-      .data$dlstcd # Delisting code
+      .data$dlstcd, # Delisting code
+      .data$dlprc # Delisting price
     ) |>
     dplyr::collect() |>
     dplyr::mutate(
@@ -78,7 +79,7 @@ clean_crsp <- function(
     rf = NULL) {
   crsp_monthly <- data |>
     dplyr::mutate(
-      mktcap = abs(.data$shrout * .data$altprc) / 10^6, # in millions of USD
+      mktcap = abs(.data$shrout * dplyr::coalesce(.data$prc,.data$altprc, .data$dlprc)) / 10^6, # in millions of USD
       mktcap = dplyr::na_if(.data$mktcap, 0)
     )
 
@@ -96,7 +97,8 @@ clean_crsp <- function(
       .data$exchcd %in% c(2, 32) ~ "AMEX",
       .data$exchcd %in% c(3, 33) ~ "NASDAQ",
       .default = "Other"
-    ))
+    )) |>
+    filter(.data$exchcd != "Other")
 
   crsp_monthly <- crsp_monthly |>
     dplyr::mutate(industry = dplyr::case_when(
@@ -128,11 +130,14 @@ clean_crsp <- function(
   if(!is.null(rf)){
     crsp_monthly <- crsp_monthly |>
       dplyr::left_join(rf,
-                       by = "month"
+            by = "month"
       ) |>
+      dplyr::filter(.data$ret_adj > -1) |>
       dplyr::mutate(
         ret_excess = .data$ret_adj - rf,
-        ret_excess = pmax(.data$ret_excess, -1)
+        #ret_excess = pmax(.data$ret_excess, -1),
+        log_ret = log(1+.data$adj_ret),
+        log_ret_excess = log(1+.data$ret_excess)
       ) |>
       tidyr::drop_na("ret_excess")
   }
@@ -170,7 +175,7 @@ get_crsp_daily <- function(
 
   if (is.null(permnos)) {
     rs <- RPostgres::dbSendQuery(wrds, "select
-                   date, permno, ret,
+                   date, permno, ret, shrout, prc
                    from CRSP.DSF WHERE date > $1 AND date < $2")
     RPostgres::dbBind(rs, list(start_date, end_date))
     crsp_daily_sub <- RPostgres::dbFetch(rs, n = batch_size)
@@ -206,7 +211,7 @@ get_crsp_daily <- function(
       dsf_db |>
       dplyr::filter(.data$permno %in% permno_batch &
                       .data$date >= start_date & .data$date <= end_date) |>
-      dplyr::select("permno", "date", "ret") |>
+      dplyr::select("date", "permno", "ret", "shrout", "prc") |>
       dplyr::collect() |>
       tidyr::drop_na()
     msedelist_sub <- msedelist_db |>
@@ -224,7 +229,7 @@ get_crsp_daily <- function(
         dsf_db |>
           dplyr::filter(.data$permno %in% permno_batch &
                           .data$date >= start_date & .data$date <= end_date) |>
-          dplyr::select("permno", "date", "ret") |>
+          dplyr::select("date", "permno", "ret", "shrout", "prc") |>
           dplyr::collect() |>
           tidyr::drop_na()
       )
@@ -267,18 +272,50 @@ get_crsp_daily <- function(
     dplyr::select(-c("dlstdt")) |>
     dplyr::mutate(month = lubridate::floor_date(.data$date, "month"))
 
-  # add risk free rate if provided, compute excess returns
-  if(!is.null(rf)){
+  # add risk free rate if provided, compute excess returns and log returns
+  if (!is.null(rf)){
   crsp_daily_sub <- crsp_daily_sub |>
     dplyr::left_join(rf, by = "date") |>
     dplyr::mutate(
       ret_excess = .data$ret - .data$rf,
-      ret_excess = pmax(.data$ret_excess, -1)
-    )
+      ret_excess = pmax(.data$ret_excess, -1),
+      log_ret_excess = log(1+.data$ret_excess)
+    ) |>
+    tidyr::drop_na("ret_excess","ret")
   }
+  # create market cap and lagged market cap
+  crsp_daily_sub <- crsp_daily_sub  |>
+    dplyr::mutate(
+      log_ret = log(1+.data$ret),
+      shrout = .data$shrout * 1000,
+      mktcap = abs(.data$shrout * .data$prc) / 10^6, # in millions of USD
+      mktcap = dplyr::na_if(.data$mktcap, 0)
+    )
 
-  crsp_daily_sub  |>
-    dplyr::select(dplyr::any_of(c("permno", "date", "month", "ret", "ret_excess", "rf")))
+  mktcap_lag <- crsp_daily_sub |>
+    dplyr::mutate(date = .data$date + lubridate::days(1)) |>
+    dplyr::select(.data$permno, .data$date, mktcap_lag = .data$mktcap)
+
+  crsp_daily_sub <- crsp_daily_sub |>
+    dplyr::left_join(mktcap_lag, by = c("permno", "date")) |>
+    tidyr::drop_na("mktcap", "mktcap_lag")
+
+  crsp_daily_sub |>
+    dplyr::select(dplyr::any_of(
+      c(
+        "permno",
+        "date",
+        "month",
+        "ret",
+        "ret_excess",
+        "rf",
+        "log_ret",
+        "log_ret_excess",
+        "mktcap",
+        "mktcap_lag"
+        )
+      )
+    )
 }
 
 #' `get_crsp_indices_daily()` downloads daily frequency stock market indices from CRSP

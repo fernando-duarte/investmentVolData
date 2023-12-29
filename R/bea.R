@@ -9,8 +9,8 @@
 #' @importFrom rlang .data
 get_bea <- function(
     table_names = c(
-      K='FAAt401',    #Table 4.1. Current-Cost Net Stock of Private Nonresidential Fixed Assets
-      D='FAAt404',    #Table 4.4. Current-Cost Depreciation of Private Nonresidential Fixed Assets
+      #K='FAAt401',    #Table 4.1. Current-Cost Net Stock of Private Nonresidential Fixed Assets
+      #D='FAAt404',    #Table 4.4. Current-Cost Depreciation of Private Nonresidential Fixed Assets
       I='FAAt407'     #Table 4.7. Investment in Private Nonresidential Fixed Assets
     ),
     start_date = "1940-01-01",
@@ -112,21 +112,7 @@ make_vars_bea <- function(
     nu = 1/2
 ) {
   list(
-    data = (clean_data %>%
-    dplyr::mutate(
-        K = .data$Equipment.K + .data$Structures.K,
-        lag.K = dplyr::lag(.data$K, order_by = .data$date),
-        lag.Equipment.K = dplyr::lag(.data$Equipment.K, order_by = .data$date),
-        lag.Structures.K = dplyr::lag(.data$Structures.K, order_by = .data$date),
-        I = .data$Equipment.I+.data$Structures.I,
-        IK = .data$I/.data$lag.K,
-        IK.Equipment = .data$Equipment.I/ .data$lag.Equipment.K,
-        IK.Structures = .data$Structures.I/ .data$lag.Structures.K,
-        IK = .data$I/.data$lag.K,
-        depreciation.Equipment = .data$Equipment.D/ (.data$lag.Equipment.K + nu * .data$Equipment.I),
-        depreciation.Structures = .data$Structures.D/ (.data$lag.Structures.K + nu * .data$Structures.I),
-        depreciation.K = (.data$lag.Equipment.K/.data$lag.K) * .data$depreciation.Equipment + (.data$lag.Structures.K/.data$lag.K) * .data$depreciation.Structures
-    )),
+    data = clean_data,
   metadata = dplyr::tibble(
       id = c(
         "i3ntotl1es00",

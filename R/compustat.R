@@ -104,63 +104,88 @@ clean_compustat <- function(
     dplyr::group_by(.data$gvkey, .data$year) |>
     dplyr::filter(.data$datadate == max(.data$datadate)) |>
     dplyr::ungroup()
+
   compustat <- compustat |>
+    # create firm-level investment, capital
     dplyr::mutate(
-      # create book equity as in https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html
-      be = dplyr::coalesce(.data$seq, .data$ceq + .data$pstk, .data$at - .data$lt) +
-        dplyr::coalesce(.data$txditc, .data$txdb + .data$itcb, 0) -
-        dplyr::coalesce(.data$pstkrv, .data$pstkl, .data$pstk, 0),
-      be = dplyr::if_else(.data$be <= 0, as.numeric(NA), .data$be),
-      # create operating profitability as in https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html
-      op = (.data$sale - dplyr::coalesce(.data$cogs, 0) -
-              dplyr::coalesce(.data$xsga, 0) - dplyr::coalesce(.data$xint, 0)) / .data$be,
-    ) |>
-    # create investment ratio as in https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html
-    dplyr::left_join(
-      compustat |>
-          dplyr::mutate(at_lag = .data$at, year = .data$year + 1) |>
-          dplyr::select(dplyr::all_of(c("gvkey", "year", "at_lag"))),
-      by = c("gvkey", "year")
-    ) |>
-      dplyr::mutate(
-        inv = .data$at / .data$at_lag - 1,
-        inv = dplyr::if_else(.data$at_lag <= 0, as.numeric(NA), .data$inv)
-      ) |>
-    dplyr::filter(
-      .data$fic == "USA" &
-       dplyr::if_all(c("emp", "sale", "at", "act", "lct", "ppent", "ppegt", "che", "gdwl"), ~ . >= 0) &
-        # drop any observation which we can identify as an American Depository Institution (ADR)
-        # drop observations with non-standard accounting
-        purrr::reduce(
-          purrr::map(
-            c(
-              # adr suffixes
-              "-ADR",
-              "-ADS",
-              "ADR NEW",
-              "AM SHARES",
-              "AMER SH",
-              "NY REG",
-              "NY SH",
-              "NY SHARES",
-              "SPON ADR",
-              "-REDH",
-              "-PRE FASB",
-              "-PRO FORMA"
-            ),
-            \(suffix) stringr::str_detect(.data$conm, suffix, negate = TRUE) #stringr::str_ends(.data$conm, suffix, negate = TRUE)
-          ),
-          `&`
-        )
-    ) |>
-    dplyr::filter(is.na(.data$adrr)) |>
-    dplyr::select(!c("conm","adrr")) |>
-    dplyr::rename(dplyr::all_of(c(date = "datadate"))) |>
-    dplyr::mutate(
-      year = lubridate::year(.data$date),
-      quarter = lubridate::quarter(.data$date),
-      month = lubridate::month(.data$date),
+      firmI = .data$capx - .data$sppe, #Gross investment in physical capital is computed as capital expenditures minus sales of property, plant and equipment
+      firmK_gross = dplyr::na_if(.data$ppegt,0), # Property, Plant and Equipment - Total (Gross)
+      firmK_net = dplyr::na_if(.data$ppent,0), # Property, Plant and Equipment - Total (Net)
     )
+
+    # and their lags
+    compustat <- compustat |>
+      dplyr::left_join(
+        compustat |>
+          dplyr::mutate(
+            firmI_lag = .data$firmI,
+            firmK_gross_lag = .data$firmK_gross,
+            firmK_net_lag = .data$firmK_net,
+            year = .data$year + 1
+            ) |>
+          dplyr::select(dplyr::all_of(c("gvkey", "year", "firmI_lag","firmK_gross_lag","firmK_net_lag"))),
+        by = c("gvkey", "year")
+      )
+
+    compustat <- compustat |>
+      dplyr::mutate(
+        # create book equity as in https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html
+        be = dplyr::coalesce(.data$seq, .data$ceq + .data$pstk, .data$at - .data$lt) +
+          dplyr::coalesce(.data$txditc, .data$txdb + .data$itcb, 0) -
+          dplyr::coalesce(.data$pstkrv, .data$pstkl, .data$pstk, 0),
+        be = dplyr::if_else(.data$be <= 0, as.numeric(NA), .data$be),
+        # create operating profitability as in https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html
+        op = (.data$sale - dplyr::coalesce(.data$cogs, 0) -
+                dplyr::coalesce(.data$xsga, 0) - dplyr::coalesce(.data$xint, 0)) / .data$be,
+      ) |>
+      # create investment ratio as in https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html
+      dplyr::left_join(
+        compustat |>
+            dplyr::mutate(at_lag = .data$at, year = .data$year + 1) |>
+            dplyr::select(dplyr::all_of(c("gvkey", "year", "at_lag"))),
+        by = c("gvkey", "year")
+      ) |>
+        dplyr::mutate(
+          inv = .data$at / .data$at_lag - 1,
+          inv = dplyr::if_else(.data$at_lag <= 0, as.numeric(NA), .data$inv)
+        ) |>
+      dplyr::filter(
+        .data$fic == "USA" &
+         dplyr::if_all(c("emp", "sale", "at", "act", "lct", "ppent", "ppegt", "che", "gdwl", "firmK_gross", "firmK_net"), ~ . >= 0) &
+          # drop any observation which we can identify as an American Depository Institution (ADR)
+          # drop observations with non-standard accounting
+          purrr::reduce(
+            purrr::map(
+              c(
+                # adr suffixes
+                "-ADR",
+                "-ADS",
+                "ADR NEW",
+                "AM SHARES",
+                "AMER SH",
+                "NY REG",
+                "NY SH",
+                "NY SHARES",
+                "SPON ADR",
+                "-REDH",
+                "-PRE FASB",
+                "-PRO FORMA"
+              ),
+              \(suffix) stringr::str_detect(.data$conm, suffix, negate = TRUE) #stringr::str_ends(.data$conm, suffix, negate = TRUE)
+            ),
+            `&`
+          )
+      ) |>
+      dplyr::filter(is.na(.data$adrr)) |>
+      dplyr::select(!c("conm","adrr")) |>
+      dplyr::rename(dplyr::all_of(c(date = "datadate"))) |>
+      dplyr::mutate(
+        year = lubridate::year(.data$date),
+        quarter = lubridate::quarter(.data$date),
+        month = lubridate::month(.data$date),
+      ) |>
+      tidyr::drop_na("firmK_gross","firmK_net","firmI","firmK_gross_lag","firmK_net_lag") |>
+      filter(.data$exchg %in% c(1,2,3) )
 }
 
 

@@ -1,4 +1,3 @@
-library(investmentVolData)
 library(tidyverse)
 
 fred <- get_fred()
@@ -24,10 +23,6 @@ crsp <- clean_crsp(crsp_raw,rf)
 permnos <- crsp |>
   distinct(permno) |>
   pull()
-# crsp_daily <- get_crsp_daily(
-#     rf = rf_daily,
-#     permnos = permnos
-#   )
 
 compustat_raw <- get_compustat()
 compustat <- clean_compustat(compustat_raw)
@@ -41,7 +36,7 @@ crsp_monthly <- crsp |>
   select(-month)
 
 crsp_compustat <- crsp_monthly |>
-  left_join(compustat, by = c("gvkey", "date")) |>
+  right_join(compustat, by = c("gvkey", "date")) |>
   left_join(sic, by = c("gvkey")) |>
   dplyr::mutate(
     sic = as.numeric(stringr::str_sub(.data$sic, start = 1, end=2) )
@@ -50,6 +45,7 @@ crsp_compustat <- crsp_monthly |>
     .data$sic != 49 & # utilities
       ! dplyr::between(.data$sic, 60, 69) & # finance and real estate
       ! dplyr::between(.data$sic, 90, 99) # public administration
+      #drop oil companies too?
   )
 #  drop_na("sic") to drop if 2-digit SIC code is missing
 
@@ -57,53 +53,72 @@ crsp_compustat <- crsp_monthly |>
 # If not available then use CRSP's historical SICCD
 # coalesce(a.sich,d.siccd) as sic
 
-crsp_compustat_agregate <- crsp_compustat %>% dplyr::mutate(
-  firmI = capx - sppe, #Gross investment in physical capital is computed as capital expenditures minus sales of property, plant and equipment
-  firmK_gross = na_if(ppegt,0), # Property, Plant and Equipment - Total (Gross)
-  firmK_net = na_if(ppent,0), # Property, Plant and Equipment - Total (Net)
-  firmIK_gross = firmI/firmK_gross,
-  firmIK_net = firmI/firmK_net
-) %>%
-  drop_na(firmIK_gross,firmIK_net) %>%
-  dplyr::group_by(year,quarter) %>%
-  dplyr::summarize(
-    firmI = sum(firmI, na.rm = TRUE),
-    firmK_gross = sum(firmK_gross, na.rm = TRUE),
-    firmK_net = sum(firmK_net, na.rm = TRUE),
-    firmIK_gross = mean(firmIK_gross, na.rm = TRUE),
-    firmIK_net = mean(firmIK_net, na.rm = TRUE),
-    n = n()
-  ) %>%
-  ungroup() %>%
-  mutate(
-    date = lubridate::ymd(paste0(.data$year,"-",.data$quarter * 3 - 2 ,"-","01"))
+
+# Daily indices -----------------------------------------------------------
+crsp_indices_daily <- get_crsp_indices_daily() |>
+  dplyr::select(
+    date,
+    dplyr::all_of(c("vwretd", "vwretx", "ewretd", "ewretx", "sprtrn"))  # columns that have returns
   )
 
-# Stock market indices return and vol --------------------------------
-
-crsp_indices_daily <- get_crsp_indices_daily()
-
-#functions to collapse from daily to quarterly
-aggregation_funs <- function(x) {
+aggregation_funs <- function(x,  dt = 1) {
   dplyr::tibble(
-    avg = na_if(mean(x, na.rm = TRUE), NaN),
-    end_of_period = last(x, na_rm = TRUE),
-    sd = sd(x, na.rm = TRUE)
+    avg = na_if(mean((1/{{dt}})*x, na.rm = TRUE), NaN),
+    cumret = prod(1+x)-1,
+    sd = sqrt(1/{{dt}})*sd(x, na.rm = TRUE)
   )
 }
 
-crsp_indices <- timetk::summarize_by_time(
-  crsp_indices_daily |> dplyr::select("date","vwretd", "vwretx", "ewretd", "ewretx", "sprtrn"),
-  .date_var = date,
-  .by = "quarter",
-  dplyr::across(dplyr::where(is.numeric),
-                \(x) aggregation_funs(x),
-                .unpack = TRUE
-  ),
-  .type = "ceiling"
-) %>%
-  #remove column if all NA
-  dplyr::select_if(~ !all(is.na(.)))
+crsp_indices <- crsp_indices_daily %>%  timetk::summarize_by_time(
+    .date_var = date,
+    .by = "quarter",
+    dplyr::across(dplyr::where(is.numeric),
+                  \(x) aggregation_funs(x, 4/252),
+                  .unpack = TRUE
+    )
+    )
+
+
+# Daily individual stock returns ------------------------------------------
+crsp_daily <- get_crsp_daily(
+    rf = rf_daily,
+    permnos = unique(crsp_compustat$permno)
+  )
+
+crsp_daily_portfolios <- crsp_daily %>%
+  dplyr::group_by(date) %>%
+  dplyr::mutate(
+    weights = .data$mktcap_lag / sum(.data$mktcap_lag),
+    dplyr::across(
+      .cols = dplyr::contains("ret"),
+      ~ sum(.x * .data$weights),
+      .names = "{.col}_vw"
+    ),
+    dplyr::across(
+      .cols = dplyr::contains("ret") & !dplyr::ends_with("_vw"),
+      ~ mean(.x, na.rm = TRUE),
+      .names = "{.col}_ew"
+    )
+  ) %>%
+  dplyr::summarize(
+    dplyr::across(dplyr::ends_with("_ew") | dplyr::ends_with("_vw"), last)
+  )
+
+
+crsp_quarterly_portfolios <- crsp_daily_portfolios %>%
+  mutate(quarter = lubridate::quarter(date)) %>%
+  group_by(quarter) %>%
+  timetk::summarize_by_time(
+    .date_var = date,
+    .by = "quarter",
+    dplyr::across(dplyr::where(is.numeric),
+                  \(x) aggregation_funs(x, 4/252),
+                  .unpack = TRUE
+    )
+  )
+
+
+
 
 # Merge everything --------------------------------------------------------
 
@@ -111,12 +126,12 @@ ts <- variables <- purrr::reduce(
   list(
     pivot_wider(fred$data,names_from = label,values_from=value,id_cols=date) ,
     bea$data %>% select(!starts_with("UNIT_MULT")),
-    crsp_compustat_agregate%>% select(-c("year","quarter")),
     crsp_indices %>% select(!ends_with("end_of_period"))
     ),
   dplyr::full_join,
   by = "date"
-  )
+  ) %>%
+  arrange(date)
 
 
 # Save to database --------------------------------------------------------
@@ -163,11 +178,6 @@ RSQLite::dbWriteTable(database,
 RSQLite::dbWriteTable(database,
              "crsp_compustat",
              value = crsp_compustat,
-             overwrite = TRUE
-)
-dbWriteTable(database,
-             "crsp_compustat_agregate",
-             value = crsp_compustat_agregate,
              overwrite = TRUE
 )
 dbWriteTable(database,
