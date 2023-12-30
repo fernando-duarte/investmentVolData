@@ -1,10 +1,9 @@
 library(tidyverse)
 library(RSQLite)
 library(scales)
-library(tsibble)
-library(fable)
-library(timetk)
 library(ggplot2)
+library(ggeasy)
+library(latex2exp)
 
 # load
 all_data <- dbConnect(
@@ -13,32 +12,79 @@ all_data <- dbConnect(
   extended_types = TRUE
 )
 dbListTables(all_data)
+ts <- tbl(all_data, "ts") %>%
+  collect()
 
-# # next: add descriptions to bea tibble
-# K = "Physical capital $K$ is the sum of the current-cost net
-# stocks of private non-residential equipment (line 2) and structures (line 3)
-# from the BEA\'s Fixed Asset Tables, Table 4.1., at annual frequency in billions
-# of dollars.",
-# I = "Investment $I$ is the sum of current-dollars gross private
-# investment flows in non-residential equipment (line 2) and structures (line 3)
-# from the BEA\'s Fixed Asset Tables, Table 4.7., at annual frequency in billions
-# of dollars.",
-# IK = "$I/K$"
-# label_I_NIPA <- "$I_{NIPA}$ is the sum of gross private domestic
-# investment in non-residential equipment (line 10) and structures (line 11)
-# from NIPA Table 1.1.5. in current-dollars (billions), at quarterly frequency,
-# seasonally adjusted at annual rates."
-# label_firmK_net <- "$K_{compustat,net}$ is the sum of net property, plan
-# and equipment (variable ppent) over all the firms in our Compustat sample."
-# label_firmK_gross <- "$K_{compustat,gross}$ is the sum of gross property,
-# plan and equipment (variable ppegt) over all the firms in our Compustat sample."
-# label_firmI <- "$I_{compustat}$ is the sum of gross invesment over all
-# firms in our Compustat sample, where gross investment is capital
-# expenditures (variable capx) minus sales of property, plant and equipment (variable sppe)."
-#
-# label_firmIK_net <- "$I_{compustat}/K_{compustat,net}$"
-# label_firmIK_gross <- "$I_{compustat}/K_{compustat,gross}$"
-#
+
+
+
+
+crsp_compustat_agregate <- crsp_compustat %>% dplyr::mutate(
+  firmIK_gross = firmI/firmK_gross_lag,
+  firmIK_net = firmI/firmK_net_lag
+) %>%
+  drop_na(firmIK_gross,firmIK_net) %>%
+  dplyr::group_by(year,quarter) %>%
+  dplyr::summarize(
+    firmI = sum(firmI, na.rm = TRUE),
+    firmK_gross = sum(firmK_gross, na.rm = TRUE),
+    firmK_net = sum(firmK_net, na.rm = TRUE),
+    firmI_lag = sum(firmI_lag, na.rm = TRUE),
+    firmK_gross_lag = sum(firmK_gross_lag, na.rm = TRUE),
+    firmK_net_lag = sum(firmK_net_lag, na.rm = TRUE),
+    xs_avg_firmIK_gross = mean(firmIK_gross, na.rm = TRUE),
+    xs_avg_firmIK_net = mean(firmIK_net, na.rm = TRUE),
+    n = n(),
+    vw_return_excess = sum(mktcap_lag / sum(mktcap_lag) * ret_excess)
+  ) %>%
+  ungroup() %>%
+  mutate(
+    date = lubridate::ymd(paste0(.data$year,"-",.data$quarter * 3 - 2 ,"-","01")),
+    firmIK_gross = firmI/firmK_gross_lag,
+    firmIK_net = firmI/firmK_net_lag,
+  )
+
+crsp_compustat_agregate%>% select(-c("year","quarter")),
+
+# Stock market indices return and vol --------------------------------
+
+%>%
+  #remove column if all NA
+  dplyr::select_if(~ !all(is.na(.)))
+%>%
+  dplyr::mutate(
+    K = .data$Equipment.K + .data$Structures.K,
+    lag.K = dplyr::lag(.data$K, order_by = .data$date),
+    lag.Equipment.K = dplyr::lag(.data$Equipment.K, order_by = .data$date),
+    lag.Structures.K = dplyr::lag(.data$Structures.K, order_by = .data$date),
+    I = .data$Equipment.I+.data$Structures.I,
+    IK = .data$I/.data$lag.K,
+    IK.Equipment = .data$Equipment.I/ .data$lag.Equipment.K,
+    IK.Structures = .data$Structures.I/ .data$lag.Structures.K,
+    IK = .data$I/.data$lag.K,
+    depreciation.Equipment = .data$Equipment.D/ (.data$lag.Equipment.K + nu * .data$Equipment.I),
+    depreciation.Structures = .data$Structures.D/ (.data$lag.Structures.K + nu * .data$Structures.I),
+    depreciation.K = (.data$lag.Equipment.K/.data$lag.K) * .data$depreciation.Equipment + (.data$lag.Structures.K/.data$lag.K) * .data$depreciation.Structures
+  ))
+
+# Plots -------------------------------------------------------------------
+ts %>% select(IK, firmIK_gross, firmIK_net,date) %>%
+  pivot_longer(c(IK, firmIK_gross, firmIK_net)) %>%
+  drop_na() %>%
+  ggplot(aes(x=date,y=value,color=name))+
+  geom_path()+
+  easy_labs() +
+  ylab(NULL)+
+  xlab(NULL)+
+  theme(
+    legend.title=element_blank()) +
+  scale_color_discrete(
+    labels=c(
+      IK = TeX(r"( $I_t / K_{t-1}$  from Fixed Asset Tables)" ),
+      firmIK_gross = TeX(r"(Average $I_t / K^{gross}_{t-1}$  over Compustat firms)" ),
+      firmIK_net = TeX(r"(Average $I_t / K^{net}_{t-1}$  over Compustat firms)" )
+    )
+  )
 
 
 
