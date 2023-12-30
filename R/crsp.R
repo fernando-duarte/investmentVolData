@@ -48,6 +48,7 @@ get_crsp <- function(
       .data$month, # Month of the observation
       .data$ret, # Return
       .data$shrout, # Shares outstanding (in thousands)
+      .data$prc, # Closing price or the negative bid/ask average
       .data$altprc, # Last traded price in a month
       .data$exchcd, # Exchange code
       .data$siccd, # Industry code
@@ -79,7 +80,7 @@ clean_crsp <- function(
     rf = NULL) {
   crsp_monthly <- data |>
     dplyr::mutate(
-      mktcap = abs(.data$shrout * dplyr::coalesce(.data$prc,.data$altprc, .data$dlprc)) / 10^6, # in millions of USD
+      mktcap = abs(.data$shrout * dplyr::coalesce(.data$prc, .data$altprc, .data$dlprc)) / 10^6, # in millions of USD
       mktcap = dplyr::na_if(.data$mktcap, 0)
     )
 
@@ -98,7 +99,7 @@ clean_crsp <- function(
       .data$exchcd %in% c(3, 33) ~ "NASDAQ",
       .default = "Other"
     )) |>
-    filter(.data$exchcd != "Other")
+    dplyr::filter(.data$exchcd != "Other")
 
   crsp_monthly <- crsp_monthly |>
     dplyr::mutate(industry = dplyr::case_when(
