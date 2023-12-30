@@ -9,6 +9,7 @@
 get_crsp <- function(
     start_date = "1940-01-01",
     end_date = "2023-12-31") {
+
   start_date <- lubridate::ymd(start_date)
   end_date <- lubridate::ymd(end_date)
   wrds <- RPostgres::dbConnect(
@@ -21,44 +22,47 @@ get_crsp <- function(
     password = Sys.getenv("WRDS_PASSWORD")
   )
 
-  msf_db <- dplyr::tbl(wrds, dbplyr::in_schema("crsp", "msf"))
   msenames_db <- dplyr::tbl(wrds, dbplyr::in_schema("crsp", "msenames"))
   msedelist_db <- dplyr::tbl(wrds, dbplyr::in_schema("crsp", "msedelist"))
 
+  msenames <- msenames_db |>
+    dplyr::filter(.data$shrcd %in% c(10, 11)) |>
+    dplyr::select("permno", "exchcd", "siccd", "namedt", "nameendt")
+
+  msedelist <- msedelist_db |>
+    dplyr::select("permno", "dlstdt", "dlret", "dlstcd", "dlprc") |>
+    dplyr::mutate(date = lubridate::floor_date(.data$dlstdt, "month"))
+
+  msf_db <- dplyr::tbl(wrds, dbplyr::in_schema("crsp", "msf"))
   # crsp_monthly
   msf_db |>
     dplyr::filter(.data$date >= start_date & .data$date <= end_date) |>
     dplyr::inner_join(
-      msenames_db |>
-        dplyr::filter(.data$shrcd %in% c(10, 11)) |>
-        dplyr::select(.data$permno, .data$exchcd, .data$siccd, .data$namedt, .data$nameendt),
+      msenames,
       by = c("permno")
     ) |>
     dplyr::filter(.data$date >= .data$namedt & .data$date <= .data$nameendt) |>
-    dplyr::mutate(month = lubridate::floor_date(.data$date, "month")) |>
+    dplyr::mutate(date = lubridate::floor_date(.data$date, "month")) |>
     dplyr::left_join(
-      msedelist_db |>
-        dplyr::select(.data$permno, .data$dlstdt, .data$dlret, .data$dlstcd, .data$dlprc) |>
-        dplyr::mutate(month = lubridate::floor_date(.data$dlstdt, "month")),
-      by = c("permno", "month")
+      msedelist,
+      by = c("permno", "date")
     ) |>
     dplyr::select(
-      .data$permno, # Security identifier
-      .data$date, # Date of the observation
-      .data$month, # Month of the observation
-      .data$ret, # Return
-      .data$shrout, # Shares outstanding (in thousands)
-      .data$prc, # Closing price or the negative bid/ask average
-      .data$altprc, # Last traded price in a month
-      .data$exchcd, # Exchange code
-      .data$siccd, # Industry code
-      .data$dlret, # Delisting return
-      .data$dlstcd, # Delisting code
-      .data$dlprc # Delisting price
+      "permno", # Security identifier
+      "date", # Date of the observation
+      "ret", # Return
+      "shrout", # Shares outstanding (in thousands)
+      "prc", # Closing price or the negative bid/ask average
+      "altprc", # Last traded price in a month
+      "exchcd", # Exchange code
+      "siccd", # Industry code
+      "dlret", # Delisting return
+      "dlstcd", # Delisting code
+      "dlprc" # Delisting price
     ) |>
     dplyr::collect() |>
     dplyr::mutate(
-      month = lubridate::ymd(.data$month),
+      date = lubridate::ymd(.data$date),
       shrout = .data$shrout * 1000
     )
 }
@@ -78,6 +82,7 @@ clean_crsp <- function(
     start_date = "1940-01-01",
     end_date = "2023-12-31",
     rf = NULL) {
+
   crsp_monthly <- data |>
     dplyr::mutate(
       mktcap = abs(.data$shrout * dplyr::coalesce(.data$prc, .data$altprc, .data$dlprc)) / 10^6, # in millions of USD
@@ -85,11 +90,11 @@ clean_crsp <- function(
     )
 
   mktcap_lag <- crsp_monthly |>
-    dplyr::mutate(month = .data$month %m+% months(1)) |>
-    dplyr::select(.data$permno, .data$month, mktcap_lag = .data$mktcap)
+    dplyr::mutate(date = .data$date %m+% months(1)) |>
+    dplyr::select("permno", "date", mktcap_lag = .data[["mktcap"]])
 
   crsp_monthly <- crsp_monthly |>
-    dplyr::left_join(mktcap_lag, by = c("permno", "month")) |>
+    dplyr::left_join(mktcap_lag, by = c("permno", "date")) |>
     tidyr::drop_na("mktcap", "mktcap_lag")
 
   crsp_monthly <- crsp_monthly |>
@@ -126,20 +131,20 @@ clean_crsp <- function(
       .data$dlstcd == 100 ~ .data$ret,
       TRUE ~ -1
     )) |>
-    dplyr::select(-c(.data$dlret, .data$dlstcd))
+    dplyr::filter(.data$ret_adj > -1) |>
+    dplyr::select(!dplyr::all_of(c("dlret", "dlstcd")))
 
   if(!is.null(rf)){
     crsp_monthly <- crsp_monthly |>
       dplyr::left_join(rf,
-            by = "month"
+            by = "date"
       ) |>
-      dplyr::filter(.data$ret_adj > -1) |>
       dplyr::mutate(
         ret_excess = .data$ret_adj - rf,
-        #ret_excess = pmax(.data$ret_excess, -1),
         log_ret = log(1+.data$adj_ret),
         log_ret_excess = log(1+.data$ret_excess)
       ) |>
+      dplyr::filter(.data$ret_excess > -1) |>
       tidyr::drop_na("ret_excess")
   }
   crsp_monthly
@@ -191,7 +196,7 @@ get_crsp_daily <- function(
     }
     rs_delist <- RPostgres::dbSendQuery(wrds, "select
                     permno, dlstdt, dlret,
-                    from CRSP.DSEDELIST  WHERE date > $1 AND date  < $2") # CRSP.MSEDELIST CRSP.DSEDELIST
+                    from CRSP.DSEDELIST  WHERE date > $1 AND date < $2") # CRSP.MSEDELIST CRSP.DSEDELIST
     RPostgres::dbBind(rs_delist, params = list(start = start_date, end = end_date))
     msedelist_sub <- RPostgres::dbFetch(rs_delist, n = batch_size)
     while (!RPostgres::dbHasCompleted(rs_delist)) {
@@ -263,15 +268,16 @@ get_crsp_daily <- function(
       ret = dplyr::if_else(!is.na(.data$dlret), .data$dlret, .data$ret),
       date = dplyr::if_else(!is.na(.data$dlstdt), .data$dlstdt, .data$date)
     ) |>
-    dplyr::select(-c("dlret", "dlstdt")) |>
+    dplyr::select(!dplyr::all_of(c("dlret", "dlstdt"))) |>
     dplyr::left_join(
       msedelist_sub |> dplyr::select("permno", "dlstdt"),
       by = "permno"
     ) |>
+    dplyr::filter(.data$ret > -1) |>
     dplyr::mutate(dlstdt = tidyr::replace_na(.data$dlstdt, lubridate::ymd(end_date))) |>
     dplyr::filter(.data$date <= .data$dlstdt) |>
-    dplyr::select(-c("dlstdt")) |>
-    dplyr::mutate(month = lubridate::floor_date(.data$date, "month"))
+    dplyr::select(!dplyr::all_of(c("dlstdt"))) |>
+    dplyr::mutate(date = lubridate::floor_date(.data$date, "month"))
 
   # add risk free rate if provided, compute excess returns and log returns
   if (!is.null(rf)){
@@ -279,9 +285,9 @@ get_crsp_daily <- function(
     dplyr::left_join(rf, by = "date") |>
     dplyr::mutate(
       ret_excess = .data$ret - .data$rf,
-      ret_excess = pmax(.data$ret_excess, -1),
       log_ret_excess = log(1+.data$ret_excess)
     ) |>
+    dplyr::filter(.data$ret_excess > -1) |>
     tidyr::drop_na("ret_excess","ret")
   }
   # create market cap and lagged market cap
@@ -295,7 +301,7 @@ get_crsp_daily <- function(
 
   mktcap_lag <- crsp_daily_sub |>
     dplyr::mutate(date = .data$date + lubridate::days(1)) |>
-    dplyr::select(.data$permno, .data$date, mktcap_lag = .data$mktcap)
+    dplyr::select("permno", "date", mktcap_lag = .data[["mktcap"]])
 
   crsp_daily_sub <- crsp_daily_sub |>
     dplyr::left_join(mktcap_lag, by = c("permno", "date")) |>

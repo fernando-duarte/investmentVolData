@@ -32,10 +32,10 @@ clean_famafrench <- function(
     monthly =
   data[[1]]$subsets$data[[1]] |>
     dplyr::mutate(
-      month = lubridate::floor_date(lubridate::ymd(stringr::str_c(date, "01")), "month")
+      date = lubridate::floor_date(lubridate::ymd(stringr::str_c(date, "01")), "month")
     ) |>
     dplyr::rename_with(stringr::str_to_lower) |>
-    dplyr::filter(.data$month >= start_date & .data$month <= end_date)
+    dplyr::filter(.data$date >= start_date & .data$date <= end_date)
   ,
   daily =
   data[[2]]$subsets$data[[1]] |>

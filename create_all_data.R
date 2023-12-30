@@ -15,7 +15,7 @@ famafrench_raw <- get_famafrench()
 famafrench <- clean_famafrench(famafrench_raw)
 
 rf <- famafrench$monthly |>
-  dplyr::select(month, rf) |>
+  dplyr::select(date, rf) |>
   dplyr::collect()
 rf_daily <- famafrench$daily |>
   dplyr::select(date, rf) |>
@@ -29,18 +29,17 @@ crsp <- clean_crsp(crsp_raw,rf)
 
 compustat_raw <- get_compustat(compustat_freq = "annual")
 compustat <- clean_compustat(compustat_raw,compustat_freq = "annual")
-
+# floor date compustat
 compustat_raw_q <- get_compustat(compustat_freq = "quarterly")
 compustat_q <- clean_compustat(compustat_raw_q, compustat_freq = "quarterly")
-
+# floor date compustat_q
 sic <- get_sic()
 
 # Merge CRSP and Compustat ------------------------------------------------
 crsp_compustat_link <- get_crsp_compustat(crsp)
 
 crsp_monthly <- crsp |>
-  left_join(crsp_compustat_link, by = c("permno", "date")) |>
-  select(-month)
+  left_join(crsp_compustat_link, by = c("permno", "date"))
 
 crsp_compustat <- crsp_monthly |>
   right_join(compustat, by = c("gvkey", "date")) |>
@@ -181,6 +180,11 @@ RSQLite::dbWriteTable(database,
              "compustat",
              value = compustat,
              overwrite = TRUE
+)
+RSQLite::dbWriteTable(database,
+                      "compustat_q",
+                      value = compustat_q,
+                      overwrite = TRUE
 )
 RSQLite::dbWriteTable(database,
              "crsp_compustat",
