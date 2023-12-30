@@ -4,12 +4,18 @@
 \alias{get_compustat}
 \title{Download data from Compustat using Wharton's WRDS}
 \usage{
-get_compustat(start_date = "1940-01-01", end_date = "2023-12-31")
+get_compustat(
+  start_date = "1940-01-01",
+  end_date = "2023-12-31",
+  compustat_freq = c("annual", "quarterly")
+)
 }
 \arguments{
 \item{start_date}{Starting date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
 
 \item{end_date}{Ending date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
+
+\item{compustat_freq}{Either "annual" (the default) or "quarterly"}
 }
 \description{
 \code{get_compustat()} downloads data from Compustat

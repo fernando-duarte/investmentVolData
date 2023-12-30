@@ -4,7 +4,12 @@
 \alias{clean_compustat}
 \title{\code{clean_compustat()} cleans Compustat data.}
 \usage{
-clean_compustat(data, start_date = "1940-01-01", end_date = "2023-12-31")
+clean_compustat(
+  data,
+  start_date = "1940-01-01",
+  end_date = "2023-12-31",
+  compustat_freq = c("annual", "quarterly")
+)
 }
 \arguments{
 \item{data}{Data downloaded from \link{get_compustat}}
@@ -12,6 +17,8 @@ clean_compustat(data, start_date = "1940-01-01", end_date = "2023-12-31")
 \item{start_date}{Starting date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
 
 \item{end_date}{Ending date in any format recognized by \link[lubridate:ymd]{lubridate::ymd}}
+
+\item{compustat_freq}{Either "annual" (the default) or "quarterly"}
 }
 \description{
 \code{clean_compustat()} cleans Compustat data.

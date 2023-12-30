@@ -1,3 +1,6 @@
+library(devtools)
+load_all()
+
 library(tidyverse)
 
 fred <- get_fred()
@@ -20,12 +23,16 @@ rf_daily <- famafrench$daily |>
 
 crsp_raw <- get_crsp()
 crsp <- clean_crsp(crsp_raw,rf)
-permnos <- crsp |>
-  distinct(permno) |>
-  pull()
+# permnos <- crsp |>
+#   distinct(permno) |>
+#   pull()
 
-compustat_raw <- get_compustat()
-compustat <- clean_compustat(compustat_raw)
+compustat_raw <- get_compustat(compustat_freq = "annual")
+compustat <- clean_compustat(compustat_raw,compustat_freq = "annual")
+
+compustat_raw_q <- get_compustat(compustat_freq = "quarterly")
+compustat_q <- clean_compustat(compustat_raw_q, compustat_freq = "quarterly")
+
 sic <- get_sic()
 
 # Merge CRSP and Compustat ------------------------------------------------
