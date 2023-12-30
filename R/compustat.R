@@ -304,7 +304,7 @@ clean_compustat <- function(
 
     # and their lags
     compustat <- compustat |>
-      dplyr::group_by("gvkey","date") |>
+      dplyr::group_by(.data$gvkey,.data$date) |>
       dplyr::filter(dplyr::n()==1) |> # to do: check that duplicates occur when fiscal year changes, and that they are treated correctly when creating quarterly capx
       dplyr::ungroup() |>
       dplyr::left_join(
@@ -319,6 +319,7 @@ clean_compustat <- function(
         by = c("gvkey", "date")
       )
     #  tidyr::drop_na("firmK_gross","firmK_net","firmI","firmK_gross_lag","firmK_net_lag")
+
   }
 }
 
@@ -382,3 +383,4 @@ ytd_to_q <- function(data, ytd_var, q_var_name, fiscal_q="fiscal_q") {
       )
     ) |> dplyr::select(!c("fill_","first_nonmiss_index","first_fill_","filled_invest","num_trailing_NA"))
 }
+
