@@ -1,0 +1,50 @@
+---
+title: "Data_exploration"
+format: html
+editor: visual
+---
+
+```{r}
+csv_path = "inst/extdata/csv/"
+read.csv(paste0(csv_path,"File Name.csv"))
+```
+
+## Quarto
+
+```{r}
+
+  
+{{< env fred >}}
+vtable::st(fred$data,
+           digits = 2,
+           summ=c("mean(x)","sd(x)","min(x)","max(x)","notNA(x)"),
+           summ.names = c("Mean","SD","Min","Max","N"),
+           # labels=c("Federal Funds Rate","log of Real GDP","log of Core PCE Deflator"),
+           title = "Title",
+           note = "\\textbf{Descriptive Statistics for FRED data}",
+           anchor = "sumstats_for_var",
+           file = "output/tables/bea_sumstats.tex",
+           # align = 'p{.3\\textwidth}ccccccc',
+           # fit.page = '\\textwidth',
+           # note.align = 'p{.3\\textwidth}ccccccc',
+           out = "latex"
+           # out = "viewer"
+)
+```
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
