@@ -145,7 +145,8 @@ clean_compustat <- function(
     ) {
 
   compustat <- data |>
-    dplyr::filter( (.data$fic == "USA") & (.data$exchg %in% c(1,2,3)) ) |>
+    dplyr::filter( (.data$fic == "USA")  ) |>
+    dplyr::filter( .data$exchg>10 & .data$exchg <= 20  ) |> #US exchanges
     dplyr::rename(dplyr::all_of(c(date = "datadate"))) |>
     dplyr::mutate(
       year = lubridate::year(.data$date),
@@ -237,6 +238,9 @@ clean_compustat <- function(
         dplyr::mutate(
           inv = .data$at / .data$at_lag - 1,
           inv = dplyr::if_else(.data$at_lag <= 0, as.numeric(NA), .data$inv)
+        ) %>%
+      dplyr::mutate(
+          date = lubridate::floor_date(date, unit="quarter")
         )
 
   } else if (compustat_freq=="quarterly"){
@@ -288,6 +292,7 @@ clean_compustat <- function(
         fiscal_date = lubridate::yq(.data$fiscal_quarter),
         date = .data$fiscal_date - months(3*.data$shift_q),
         date = lubridate::ceiling_date(.data$date,unit="quarter") - lubridate::days(1),
+        date = lubridate::floor_date(.data$date, unit="quarter"),
         year = lubridate::year(.data$date),
         quarter = lubridate::quarter(.data$date),
         month = lubridate::month(.data$date),

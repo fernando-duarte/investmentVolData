@@ -9,8 +9,8 @@
 #' @importFrom rlang .data
 get_bea <- function(
     table_names = c(
-      #K='FAAt401',    #Table 4.1. Current-Cost Net Stock of Private Nonresidential Fixed Assets
-      #D='FAAt404',    #Table 4.4. Current-Cost Depreciation of Private Nonresidential Fixed Assets
+      K='FAAt401',    #Table 4.1. Current-Cost Net Stock of Private Nonresidential Fixed Assets
+      D='FAAt404',    #Table 4.4. Current-Cost Depreciation of Private Nonresidential Fixed Assets
       I='FAAt407'     #Table 4.7. Investment in Private Nonresidential Fixed Assets
     ),
     start_date = "1940-01-01",
@@ -77,7 +77,7 @@ clean_bea <- function(
                               names_to = c(".value", "date"),
                               names_sep = "_",
                               names_transform = list(date = \(x) lubridate::ymd(x, truncated = 2)),
-                              values_transform = \(x) x*10^6/10^9,
+                              values_transform = \(x) x,
                             ) %>%
                             dplyr::select(
                               dplyr::all_of(c("LineDescription", "DataValue", "date", "UNIT_MULT"))
@@ -113,7 +113,7 @@ make_vars_bea <- function(
 ) {
   list(
     data = clean_data,
-  metadata = dplyr::tibble(
+    metadata = dplyr::tibble(
       id = c(
         "i3ntotl1es00",
         "i3ntotl1eq00",
@@ -146,8 +146,8 @@ make_vars_bea <- function(
         as.character()),
       frequency = "Annual",
       frequency_short = "A",
-      units = "Billions of Dollars",
-      units_short = "Bil. of $",
+      units = "Millions of Dollars",
+      units_short = "Mil. of $",
       seasonal_adjustment = "Not Seasonally Adjusted",
       seasonal_adjustment_short = "NSA",
       last_updated = paste0( as.character(lubridate::today())," 00:00:00-06"),

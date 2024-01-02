@@ -20,6 +20,6 @@ test_that("Fama-French data downloaded correctly", {
                  dplyr::select(`mkt-rf`, smb, hml, rf) %>%
                  as.matrix() %>%
                  as.vector(),
-               c(8.84, 0, 1.65, 0.44)
+               c(8.84/100, 0/100, 1.65/100, 0.44/100)
                )
   })

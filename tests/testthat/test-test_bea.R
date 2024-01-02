@@ -32,7 +32,7 @@ testthat::test_that("BEA data downloaded correctly", {
   c(
     # 33416975/10^3, 8628555/10^3, 20078458/10^3, #in billions of dollars
     # 2825242/10^3,1161318/10^3,539585/10^3, #in billions of dollars
-    3372359/10^3, 1308964/10^3, 658043/10^3 #in billions of dollars
+    3372359, 1308964, 658043 #in millions of dollars
   )
 )
 

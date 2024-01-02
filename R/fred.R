@@ -11,6 +11,7 @@
 get_fred <- function(
     series_id= c(
       "GDPC1",
+      "GDP",
       "PNFI",
 
       ##National Income and Product Accounts (NIPA)
@@ -41,7 +42,7 @@ get_fred <- function(
     ...) {
   # user-friendly names
   lookup <- c(
-    gdp = "GDPC1",
+    gdp = "GDP",
     pnfi = "PNFI",
     NIPA.Structures.I.SA = "B009RC1Q027SBEA",
     NIPA.Structures.I.NSA = "NA000339Q",

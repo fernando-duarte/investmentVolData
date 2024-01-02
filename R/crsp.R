@@ -26,7 +26,7 @@ get_crsp <- function(
   msedelist_db <- dplyr::tbl(wrds, dbplyr::in_schema("crsp", "msedelist"))
 
   msenames <- msenames_db |>
-    dplyr::filter(.data$shrcd %in% c(10, 11)) |>
+    # dplyr::filter(.data$shrcd %in% c(10, 11)) |>
     dplyr::select("permno", "exchcd", "siccd", "namedt", "nameendt")
 
   msedelist <- msedelist_db |>
@@ -97,14 +97,14 @@ clean_crsp <- function(
     dplyr::left_join(mktcap_lag, by = c("permno", "date")) |>
     tidyr::drop_na("mktcap", "mktcap_lag")
 
-  crsp_monthly <- crsp_monthly |>
-    dplyr::mutate(exchange = dplyr::case_when(
-      .data$exchcd %in% c(1, 31) ~ "NYSE",
-      .data$exchcd %in% c(2, 32) ~ "AMEX",
-      .data$exchcd %in% c(3, 33) ~ "NASDAQ",
-      .default = "Other"
-    )) |>
-    dplyr::filter(.data$exchcd != "Other")
+  # crsp_monthly <- crsp_monthly |>
+  #   dplyr::mutate(exchange = dplyr::case_when(
+  #     .data$exchcd %in% c(1, 31) ~ "NYSE",
+  #     .data$exchcd %in% c(2, 32) ~ "AMEX",
+  #     .data$exchcd %in% c(3, 33) ~ "NASDAQ",
+  #     .default = "Other"
+  #   )) |>
+  #   dplyr::filter(.data$exchcd != "Other")
 
   crsp_monthly <- crsp_monthly |>
     dplyr::mutate(industry = dplyr::case_when(
@@ -140,11 +140,13 @@ clean_crsp <- function(
             by = "date"
       ) |>
       dplyr::mutate(
-        ret_excess = .data$ret_adj - rf,
+        ret_excess = .data$ret_adj - rf
+      ) |>
+      dplyr::filter(.data$ret_excess > -1) |>
+      dplyr::mutate(
         log_ret = log(1+.data$adj_ret),
         log_ret_excess = log(1+.data$ret_excess)
       ) |>
-      dplyr::filter(.data$ret_excess > -1) |>
       tidyr::drop_na("ret_excess")
   }
   crsp_monthly
@@ -276,18 +278,19 @@ get_crsp_daily <- function(
     dplyr::filter(.data$ret > -1) |>
     dplyr::mutate(dlstdt = tidyr::replace_na(.data$dlstdt, lubridate::ymd(end_date))) |>
     dplyr::filter(.data$date <= .data$dlstdt) |>
-    dplyr::select(!dplyr::all_of(c("dlstdt"))) |>
-    dplyr::mutate(date = lubridate::floor_date(.data$date, "month"))
+    dplyr::select(!dplyr::all_of(c("dlstdt")))
 
   # add risk free rate if provided, compute excess returns and log returns
   if (!is.null(rf)){
   crsp_daily_sub <- crsp_daily_sub |>
     dplyr::left_join(rf, by = "date") |>
     dplyr::mutate(
-      ret_excess = .data$ret - .data$rf,
-      log_ret_excess = log(1+.data$ret_excess)
+      ret_excess = .data$ret - .data$rf
     ) |>
     dplyr::filter(.data$ret_excess > -1) |>
+    dplyr::mutate(
+      log_ret_excess = log(1+.data$ret_excess)
+    ) |>
     tidyr::drop_na("ret_excess","ret")
   }
   # create market cap and lagged market cap
@@ -304,8 +307,8 @@ get_crsp_daily <- function(
     dplyr::select("permno", "date", mktcap_lag = .data[["mktcap"]])
 
   crsp_daily_sub <- crsp_daily_sub |>
-    dplyr::left_join(mktcap_lag, by = c("permno", "date")) |>
-    tidyr::drop_na("mktcap", "mktcap_lag")
+    dplyr::left_join(mktcap_lag, by = c("permno", "date"))
+    # tidyr::drop_na("mktcap", "mktcap_lag") %>%
 
   crsp_daily_sub |>
     dplyr::select(dplyr::any_of(
@@ -329,11 +332,14 @@ get_crsp_daily <- function(
 #'
 #' @param start_date Starting date in any format recognized by [lubridate::ymd]
 #' @param end_date Ending date in any format recognized by [lubridate::ymd]
+#' @param rf Risk-free rate to compute excess returns. Defaults to `NULL`, in which
+#' case excess returns are not computed.
 #' @export get_crsp_indices_daily
 #' @importFrom rlang .data
 get_crsp_indices_daily <- function(
     start_date = "1940-01-01",
-    end_date = "2023-12-31"
+    end_date = "2023-12-31",
+    rf = NULL
    ) {
 
   wrds <- RPostgres::dbConnect(
@@ -348,8 +354,20 @@ get_crsp_indices_daily <- function(
   on.exit(RPostgres::dbDisconnect(wrds))
 
   indx_db <- dplyr::tbl(wrds, dbplyr::in_schema("crsp", "dsi"))
-  indx_db |>
+  indx <- indx_db |>
     dplyr::filter(.data$date >= start_date & .data$date <= end_date) |>
     dplyr::collect()
+
+  if (!is.null(rf)){
+    indx <- indx |>
+      dplyr::left_join(rf, by = "date") |>
+      dplyr::mutate(
+        dplyr::across(
+          dplyr::all_of(c("vwretd", "vwretx", "ewretd", "ewretx", "sprtrn")),  # columns that have returns
+        \(x) x - .data$rf,
+        .names = "{.col}_excess"
+        )
+      )
+  }
 }
 
