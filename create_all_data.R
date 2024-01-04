@@ -2,7 +2,6 @@ library(devtools)
 load_all()
 library(tidyverse)
 
-
 # Download data -----------------------------------------------------------
 
 ## FRED --------------------------------------------------------------------
@@ -31,61 +30,56 @@ crsp <- clean_crsp(crsp_raw,rf_monthly)
 permnos <- crsp |>
   distinct(permno) |>
   pull()
-### Individual stocks daily -------------------------------------------------------------------
+### Individual stocks daily ----------------------------------------------------
 crsp_daily <- get_crsp_daily(
   rf = rf_daily,
   permnos = permnos #unique(crsp_compustat$permno)
 )
-### Indices daily -----------------------------------------------------------
+### Indices daily --------------------------------------------------------------
 crsp_indices_daily <- get_crsp_indices_daily(
   rf = rf_daily
   ) |>
   dplyr::select(
     date,
-    dplyr::all_of(c("vwretd", "vwretx", "ewretd", "ewretx", "sprtrn")) # columns that have returns
+    # columns that have returns
+    dplyr::all_of(c("vwretd", "vwretx", "ewretd", "ewretx", "sprtrn"))
     |
-    dplyr::ends_with("_excess") # columns that excess returns
+    # columns that have excess returns
+    dplyr::ends_with("_excess")
   )
 
-## Compustat ---------------------------------------------------------------
-### Annual ------------------------------------------------------------------
+## Compustat -------------------------------------------------------------------
+### Annual ---------------------------------------------------------------------
 compustat_raw <- get_compustat(compustat_freq = "annual")
 compustat <- clean_compustat(compustat_raw,compustat_freq = "annual")
-### Quarterly ---------------------------------------------------------------
+### Quarterly ------------------------------------------------------------------
 compustat_raw_q <- get_compustat(compustat_freq = "quarterly")
 compustat_q <- clean_compustat(compustat_raw_q, compustat_freq = "quarterly")
 
-compustat_q %>% summarize(n=n(),.by="year") %>% arrange(year) %>% print(n="all")
-compustat_raw_q %>% filter(fic=="USA") %>% summarize(n=n(),.by="datadate") %>% arrange(datadate) %>% print(n="all")
-
-compustat_q %>% summarize(n=n(),.by="date") %>% arrange(date) %>% print(n="all")%>%
-  mutate(year = year(date)) %>% summarize(nn=sum(n),.by="year")%>% print(n="all")
-compustat_q %>% filter(fic=="USA") %>% summarize(n=n(),.by="year") %>% arrange(year) %>% print(n="all")
-
-### Industry codes ----------------------------------------------------------
+### Industry codes -------------------------------------------------------------
 sic <- get_sic()
 
-## CRSP-Compustat Link -----------------------------------------------------
+## CRSP-Compustat Link ---------------------------------------------------------
 crsp_compustat_link <- get_crsp_compustat(crsp)
 
-# Time aggregate ----------------------------------------------------------
+# Time aggregate ---------------------------------------------------------------
 aggregation_funs <- function(x,  dt = 1) {
   dplyr::tibble(
     avg = na_if(mean((1/{{dt}})*x, na.rm = TRUE), NaN),
-    cumret = prod(1+x)-1,
+    cumret = prod(1+x, na.rm = TRUE)-1,
     sd = sqrt(1/{{dt}})*sd(x, na.rm = TRUE)
   )
 }
 
-## CRSP --------------------------------------------------------------------
-### Individual stocks daily to quarterly-------------------------------------------------------------------
+## CRSP ------------------------------------------------------------------------
+### Individual stocks daily to quarterly----------------------------------------
 crsp_daily_portfolios <- crsp_daily %>%
   dplyr::group_by(date) %>%
   dplyr::mutate(
     weights = .data$mktcap_lag / sum(.data$mktcap_lag),
     dplyr::across(
       .cols = dplyr::contains("ret"),
-      ~ sum(.x * .data$weights),
+      ~ sum(.x * .data$weights, na.rm = TRUE),
       .names = "{.col}_vw"
     ),
     dplyr::across(
@@ -95,7 +89,9 @@ crsp_daily_portfolios <- crsp_daily %>%
     )
   ) %>%
   dplyr::summarize(
-    dplyr::across(dplyr::ends_with("_ew") | dplyr::ends_with("_vw"), last)
+    dplyr::across(dplyr::ends_with("_ew") | dplyr::ends_with("_vw"),
+                  ~ last(., na_rm = TRUE)
+                  )
   )
 
 crsp_q <- crsp_daily_portfolios %>%
@@ -103,13 +99,12 @@ crsp_q <- crsp_daily_portfolios %>%
     .date_var = date,
     .by = "quarter",
     dplyr::across(dplyr::where(is.numeric),
-                  \(x) aggregation_funs(x, 4/252),
+                  \(x) aggregation_funs(x, 1/252),
                   .unpack = TRUE
     )
   )
 
-
-### Collect permnos of each portfolio ---------------------------------------
+### Collect permnos of each portfolio ------------------------------------------
 crsp_daily_portfolios_permnos <- crsp_daily %>%
   reframe(permno = list(permno), .by = date)
 
@@ -125,18 +120,18 @@ crsp_q_permnos <- crsp_daily_portfolios_permnos %>%
   ) %>%
   mutate(permno = purrr::map(permno,\(x) unique(unlist(x))))
 
-### Indices daily to quarterly-----------------------------------------------------------
+### Indices daily to quarterly--------------------------------------------------
 crsp_indices_q <- crsp_indices_daily %>%
   timetk::summarize_by_time(
       .date_var = date,
       .by = "quarter",
       dplyr::across(dplyr::where(is.numeric),
-                    \(x) aggregation_funs(x, 4/252),
+                    \(x) aggregation_funs(x, 1/252),
                     .unpack = TRUE
   )
 )
-## CRSP-Compustat Link -----------------------------------------------------
-### Monthly to quarterly-----------------------------------------------------------
+## CRSP-Compustat Link ---------------------------------------------------------
+### Monthly to quarterly--------------------------------------------------------
 crsp_compustat_link_q <- crsp_compustat_link %>%
   dplyr::mutate(
     yq = lubridate::yq(
@@ -151,16 +146,12 @@ crsp_compustat_link_q <- crsp_compustat_link %>%
   ) %>%
   rename(date = yq)
 
-# Merge -------------------------------------------------------------------
-## CRSP and Compustat ------------------------------------------------
+# Merge ------------------------------------------------------------------------
+## CRSP and Compustat ----------------------------------------------------------
 compustat_permnos_q <- compustat_q |>
   left_join(crsp_compustat_link_q, by = c("gvkey", "date")) %>%
   arrange(permno, date) %>%
   relocate(gvkey,permno,date,capxy,capx,sppey,sppe,contains("firm"))
-
-compustat_permnos_q %>%
-  filter(!is.na(firmI)) %>%
-  summarize(n=n())
 
 compustat_ports_q <- compustat_permnos_q %>%
   left_join(
@@ -168,14 +159,6 @@ compustat_ports_q <- compustat_permnos_q %>%
     by = c("permno", "date")
   )
 # %>%  drop_na(permno)
-
-compustat_ports_q %>%
-  filter(!is.na(permno) & !is.na(firmI)) %>%
-  summarize(n=n())
-
-compustat_ports_q %>%
-  filter(!is.na(capx)) %>%
-  summarize(n=n())
 
 crsp_compustat <- compustat_ports_q |>
   left_join(sic, by = c("gvkey")) |>
@@ -186,23 +169,18 @@ crsp_compustat <- compustat_ports_q |>
     .data$sic != 49 & # utilities
       ! dplyr::between(.data$sic, 60, 69) & # finance and real estate
       ! dplyr::between(.data$sic, 90, 99) # public administration
-    #drop oil companies too?
+
   )
-#  drop_na("sic") to drop if 2-digit SIC code is missing
+# TO DO: decide whether to drop oil companies as well
+# TO DO: decode whether to drop_na("sic") to drop if 2-digit SIC code is missing
 
-# Select Compustat's SICH as primary SIC code,
-# If not available then use CRSP's historical SICCD
-# coalesce(a.sich,d.siccd) as sic
-
-crsp_compustat_agregate <- compustat %>% #crsp_compustat %>%
+crsp_compustat_agregate <- compustat %>%
   dplyr::mutate(
-  firmCapex = sum(capex, na.rm = TRUE),
   firmIK_gross = firmI/firmK_gross_lag,
   firmIK_net = firmI/firmK_net_lag,
-  firmCapexK_gross = firmCapex/firmK_gross_lag,
-  firmCapexK_net = firmCapex/firmK_net_lag
+  firmCapxK_gross = capx/firmK_gross_lag,
+  firmCapxK_net = capx/firmK_net_lag
 ) %>%
-  # drop_na(firmIK_gross,firmIK_net) %>%
   dplyr::group_by(date) %>%
   dplyr::summarize(
     firmI = sum(firmI, na.rm = TRUE),
@@ -211,30 +189,32 @@ crsp_compustat_agregate <- compustat %>% #crsp_compustat %>%
     firmI_lag = sum(firmI_lag, na.rm = TRUE),
     firmK_gross_lag = sum(firmK_gross_lag, na.rm = TRUE),
     firmK_net_lag = sum(firmK_net_lag, na.rm = TRUE),
-    xs_avg_firmCapexK_gross = mean(firmCapexK_gross, na.rm = TRUE),
-    xs_avg_firmCapexK_net = mean(firmCapexK_net, na.rm = TRUE),
+    firmCapx = sum(capx, na.rm = TRUE),
+    xs_avg_firmCapxK_gross = mean(firmCapxK_gross, na.rm = TRUE),
+    xs_avg_firmCapxK_net = mean(firmCapxK_net, na.rm = TRUE),
     xs_avg_firmIK_gross = mean(firmIK_gross, na.rm = TRUE),
     xs_avg_firmIK_net = mean(firmIK_net, na.rm = TRUE),
+    xs_med_firmCapxK_gross = median(firmCapxK_gross, na.rm = TRUE),
+    xs_med_firmCapxK_net = median(firmCapxK_net, na.rm = TRUE),
+    xs_med_firmIK_gross = median(firmIK_gross, na.rm = TRUE),
+    xs_med_firmIK_net = median(firmIK_net, na.rm = TRUE),
     n = n()
   ) %>%
   ungroup() %>%
   mutate(
     firmIK_gross = firmI/firmK_gross_lag,
     firmIK_net = firmI/firmK_net_lag,
-    firmCapexK_gross = firmCapex/firmK_gross_lag,
-    firmCapexK_net = firmCapex/firmK_net_lag,
+    firmCapxK_gross = firmCapx/firmK_gross_lag,
+    firmCapxK_net = firmCapx/firmK_net_lag,
   ) %>%
   arrange(date) %>%
-  relocate(date,n,firmIK_gross,xs_avg_firmIK_gross,firmIK_net,xs_avg_firmIK_net)
+  relocate(date,n) %>%
+  mutate(year=year(date))
 
-print(crsp_compustat_agregate,n="all")
-
-
-# Merge everything --------------------------------------------------------
-
+# Merge everything -------------------------------------------------------------
 ts <- variables <- purrr::reduce(
   list(
-    pivot_wider(fred$data,names_from = label,values_from=value,id_cols=date) ,
+    pivot_wider(fred$data,names_from = label,values_from=value,id_cols=date) %>% select(!`NA`),
     bea$data %>% select(!starts_with("UNIT_MULT")),
     crsp_indices_q,
     crsp_q,
@@ -272,18 +252,15 @@ ts <- ts %>%
     firmK_net = firmK_net/1000,
     firmI_lag = firmI_lag/1000,
     firmK_gross_lag = firmK_gross_lag/1000,
-    firmK_net_lag = firmK_net_lag/1000
+    firmK_net_lag = firmK_net_lag/1000,
+    firmCapx = firmCapx/1000,
   )
 
+# Construct aggregate K, I, D --------------------------------------------------
 
-
-
-
-
-# Construct aggregate K, I, D ---------------------------------------------
-
-# parameter between 0 and 1 that determines assumption of when investment is placed in service
-#nu  = 0 is end of year, nu  = 1 is beginning of year; BEA uses nu  = 1/2
+# parameter between 0 and 1 that determines assumption of when investment
+# is placed in service
+# nu  = 0 is end of year, nu  = 1 is beginning of year; BEA uses nu  = 1/2
 nu <- 1/2
 
 ts <- ts %>%
@@ -293,8 +270,8 @@ ts <- ts %>%
   dplyr::mutate(
     tsEquipment.K = Equipment.K,
     tsStructures.K = Structures.K,
-    tsEquipment.I = Equipment.I, # "NIPA.Equipment.I.SA" "NIPA.Equipment.I" "NIPA.Equipment.I.NSA"; from FA: "Equipment.I"
-    tsStructures.I = Structures.I, # "NIPA.Structures.I.SA" "NIPA.Structures.I" "NIPA.Structures.I.NSA"; from FA: "Structures.I"
+    tsEquipment.I = Equipment.I,
+    tsStructures.I = Structures.I,
     tsEquipment.D = Equipment.D,
     tsStructures.D = Structures.D,
     tsY = gdp
@@ -313,71 +290,13 @@ ts <- ts %>%
     depreciation.Equipment = .data$tsEquipment.D/ (.data$lag.Equipment.K + nu * .data$tsEquipment.I),
     depreciation.Structures = .data$tsStructures.D/ (.data$lag.Structures.K + nu * .data$tsStructures.I),
     depreciation.K = (.data$lag.Equipment.K/.data$lag.K) * .data$depreciation.Equipment + (.data$lag.Structures.K/.data$lag.K) * .data$depreciation.Structures,
+    Y = tsY,
     YK = .data$tsY/.data$lag.K,
-    IY = .data$I/.data$tsY
+    IY = .data$I/.data$tsY,
+    I.SA = NIPA.Structures.I.SA + NIPA.Equipment.I.SA,
+    I.NSA = NIPA.Structures.I.NSA + NIPA.Equipment.I.NSA
   )
 # Save to csv -------------------------------------------------------------
 csv_path = "inst/extdata/csv/"
 write.csv(ts, paste0(csv_path,"quarterly_time_series",".csv"), row.names = FALSE)
-
-
-
-# Save to database --------------------------------------------------------
-library(RSQLite)
-library(dbplyr)
-
-# create database
-database <- RSQLite::dbConnect(
-  RSQLite::SQLite(),
-  "inst/extdata/all_data.sqlite",
-  extended_types = TRUE
-)
-# save
-RSQLite::dbWriteTable(database,
-                      "ts",
-                      value = ts,
-                      overwrite = TRUE
-)
-RSQLite::dbWriteTable(database,
-             "fred",
-             value = fred$data,
-             overwrite = TRUE
-)
-RSQLite::dbWriteTable(database,
-             "crsp",
-             value = crsp,
-             overwrite = TRUE
-)
-RSQLite::dbWriteTable(database,
-             "famafrench",
-             value = famafrench$monthly,
-             overwrite = TRUE
-)
-RSQLite::dbWriteTable(database,
-             "bea",
-             value = bea$data,
-             overwrite = TRUE
-)
-RSQLite::dbWriteTable(database,
-             "compustat",
-             value = compustat,
-             overwrite = TRUE
-)
-RSQLite::dbWriteTable(database,
-                      "compustat_q",
-                      value = compustat_q,
-                      overwrite = TRUE
-)
-RSQLite::dbWriteTable(database,
-             "crsp_compustat",
-             value = crsp_compustat,
-             overwrite = TRUE
-)
-dbWriteTable(database,
-             "crsp_indices",
-             value = crsp_indices,
-             overwrite = TRUE
-)
-dbDisconnect(database)
-
 
