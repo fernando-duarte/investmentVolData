@@ -267,6 +267,29 @@ purrr::pmap(
   )
 )
 
+purrr::pmap(
+  list(
+    out_fmt=list("plot","pdf"),
+    thm=list(tt,pp)
+  )
+  ,
+  \(out_fmt,thm)
+  tsplot(
+    list(
+      "Equipment" = plot_ts[,"Equipment.I"]/plot_ts[,"Private.nonresidential.fixed.assets.I"],
+      "Structures" = plot_ts[,"Structures.I"]/plot_ts[,"Private.nonresidential.fixed.assets.I"],
+      "Intangibles" = (plot_ts[,"Private.nonresidential.fixed.assets.I"]-plot_ts[,"Structures.I"]-plot_ts[,"Equipment.I"])/plot_ts[,"Private.nonresidential.fixed.assets.I"]
+    ),
+    plot_title = "Components of Private Nonresidential Investment in Fixed Assets",
+    plot_subtitle = "share of total",
+    filename = paste0(plot_path,"agg_inv_shares"),
+    theme = thm,
+    output_format = out_fmt,
+    manual_value_ticks_l = seq(0, 1, by = 0.2),
+    left_as_band = TRUE
+  )
+)
+
 ## variables in ts_agg_ratios  -------------------------------------------------
 purrr::pmap(
   list(
